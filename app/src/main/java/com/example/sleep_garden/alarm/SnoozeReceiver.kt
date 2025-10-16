@@ -6,31 +6,39 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import android.util.Log
 import android.widget.Toast
 
 class SnoozeReceiver : BroadcastReceiver() {
+
     @SuppressLint("ScheduleExactAlarm")
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d("SnoozeReceiver", "スヌーズ受信 → 一旦停止＆再セット")
+        Log.d("SnoozeReceiver", "🕒 スヌーズボタンが押されました")
 
-        // ✅ 一旦アラーム停止
-        AlarmReceiver.stopSound(context)
+        // ✅ アラーム音を停止
+        AlarmActivity.stopAlarmSoundStatic()
 
-        // ✅ 5分後に再びアラームをセット
-        val snoozeTime = System.currentTimeMillis() + 1 * 60 * 1000 // 1分後
+        // ✅ 1分後（60000ミリ秒後）に再びアラームを鳴らす
+        val snoozeTime = SystemClock.elapsedRealtime() + 60_000
 
+        // 🔁 AlarmReceiver 経由で再び AlarmActivity を起動
         val alarmIntent = Intent(context, AlarmReceiver::class.java)
         val pendingIntent = PendingIntent.getBroadcast(
             context,
-            0,
+            2001, // 固定ID（同じアラームを上書き）
             alarmIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, snoozeTime, pendingIntent)
+        alarmManager.setExactAndAllowWhileIdle(
+            AlarmManager.ELAPSED_REALTIME_WAKEUP,
+            snoozeTime,
+            pendingIntent
+        )
 
-        Toast.makeText(context, "1分後に再通知します", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "⏰ スヌーズ：1分後に再アラーム", Toast.LENGTH_SHORT).show()
+        Log.d("SnoozeReceiver", "✅ 1分後に再アラーム設定完了")
     }
 }

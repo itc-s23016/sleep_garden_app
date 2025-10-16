@@ -14,7 +14,9 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Sleep_Garden">
 
-        <activity android:name=".MainActivity"
+        <!-- 🌿 メイン画面 -->
+        <activity
+            android:name=".MainActivity"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>
@@ -22,7 +24,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <receiver android:name=".alarm.StopAlarmReceiver" />
+        <!-- 🔔 アラーム画面（AlarmActivity） -->
+        <activity
+            android:name=".alarm.AlarmActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Sleep_Garden"
+            android:launchMode="singleTop" />
         <receiver android:name=".alarm.AlarmReceiver" />
         <receiver android:name=".alarm.SnoozeReceiver" />
     </application>
