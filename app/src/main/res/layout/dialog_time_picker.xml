@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="20dp"
+    android:background="@android:color/white">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="時間を設定"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:paddingBottom="8dp" />
+
+    <TimePicker
+        android:id="@+id/timePicker"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:timePickerMode="spinner" />
+
+    <Button
+        android:id="@+id/okButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="設定"
+        android:layout_marginTop="10dp" />
+
+</LinearLayout>

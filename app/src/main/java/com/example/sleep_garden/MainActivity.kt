@@ -13,9 +13,8 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,15 +23,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.example.sleep_garden.alarm.AlarmActivity
 import com.example.sleep_garden.alarm.AlarmReceiver
+import com.example.sleep_garden.alarm.TimePickerBottomSheet
+import com.example.sleep_garden.alarm.AlarmActivity
 import java.util.*
 
-class MainActivity : ComponentActivity() {
-
-    private val requestExactAlarmPermission = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { }
+class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -55,6 +51,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
             if (!alarmManager.canScheduleExactAlarms()) {
+
                 val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
                     data = Uri.parse("package:$packageName")
                 }
@@ -73,11 +70,44 @@ class MainActivity : ComponentActivity() {
             manager.createNotificationChannel(channel)
         }
 
-        // ✅ Compose UI
+        // Compose UI
         setContent {
             MaterialTheme {
-                AlarmSetScreen { hour, minute ->
-                    setAlarm(hour, minute)
+                var selectedHour by remember { mutableStateOf(7) }
+                var selectedMinute by remember { mutableStateOf(0) }
+
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(32.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "設定時刻: %02d:%02d".format(selectedHour, selectedMinute),
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // BottomSheetを表示
+                        Button(onClick = {
+                            val sheet = TimePickerBottomSheet { hour, minute ->
+                                selectedHour = hour
+                                selectedMinute = minute
+                            }
+                            sheet.show(supportFragmentManager, "TimePickerSheet")
+                        }) {
+                            Text("時間を設定")
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(onClick = {
+                            setAlarm(selectedHour, selectedMinute)
+                        }) {
+                            Text("この時間にアラーム設定")
+                        }
+                    }
                 }
             }
         }
@@ -85,6 +115,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+
         // ✅ アプリ再開時にも音を止める
         AlarmActivity.stopAlarmSoundStatic()
     }
@@ -98,7 +129,6 @@ class MainActivity : ComponentActivity() {
 
         // 現在時刻を基準に設定時刻を決定
         val calendar = Calendar.getInstance().apply {
-            timeInMillis = System.currentTimeMillis()
             set(Calendar.HOUR_OF_DAY, hour)
             set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
@@ -130,45 +160,6 @@ class MainActivity : ComponentActivity() {
             "⏰ アラームを %02d:%02d に設定しました".format(hour, minute),
             Toast.LENGTH_SHORT
         ).show()
-    }
-}
-
-@Composable
-fun AlarmSetScreen(onSetAlarm: (Int, Int) -> Unit) {
-    var showDialog by remember { mutableStateOf(false) }
-    var selectedHour by remember { mutableStateOf(7) }
-    var selectedMinute by remember { mutableStateOf(0) }
-
-    Surface(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "設定時刻: %02d:%02d".format(selectedHour, selectedMinute),
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = { showDialog = true }) {
-                    Text("時間を選択")
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(onClick = {
-                    onSetAlarm(selectedHour, selectedMinute)
-                }) {
-                    Text("この時間にアラーム設定")
-                }
-            }
-
-            if (showDialog) {
-                TimePickerDialog(
-                    onDismissRequest = { showDialog = false },
-                    onTimeSelected = { hour, minute ->
-                        selectedHour = hour
-                        selectedMinute = minute
-                        showDialog = false
-                    }
-                )
-            }
-        }
     }
 }
 
