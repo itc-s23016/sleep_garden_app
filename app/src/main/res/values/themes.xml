@@ -1,5 +1,12 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.Sleep_Garden" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- AppCompat 互換テーマ -->
+    <style name="Theme.Sleep_Garden" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <!-- カスタマイズする色 -->
+        <item name="colorPrimary">@color/purple_500</item>
+        <item name="colorPrimaryVariant">@color/purple_700</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/teal_200</item>
+    </style>
+
 </resources>
