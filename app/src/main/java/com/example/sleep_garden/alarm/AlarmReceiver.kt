@@ -1,59 +1,72 @@
 package com.example.sleep_garden.alarm
 
-import android.Manifest
-import android.app.NotificationChannel
+import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
-import androidx.annotation.RequiresPermission
+import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
-import androidx.core.app.NotificationManagerCompat
 
 class AlarmReceiver : BroadcastReceiver() {
 
-    @RequiresPermission(Manifest.permission.POST_NOTIFICATIONS)
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d("AlarmReceiver", "⏰ アラーム受信！")
+        val alarmId = intent.getStringExtra("alarmId") ?: "default"
 
-        val channelId = "alarm_channel"
-        val channelName = "アラーム通知"
-
-        val notificationManager =
-            context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                channelName,
-                NotificationManager.IMPORTANCE_HIGH
-            )
-            notificationManager.createNotificationChannel(channel)
+        // 1) 音を鳴らすサービスを起動（フォアグラウンド）
+        val svc = Intent(context, AlarmRingtoneService::class.java).apply {
+            action = AlarmRingtoneService.ACTION_START
+            putExtra("alarmId", alarmId)
         }
+        // Android 8.0+ は startForegroundService
+        context.startForegroundService(svc)
 
-        val alarmIntent = Intent(context, AlarmActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        // 2) フルスクリーン通知（ロック画面でも前面に）
+        val fullScreenIntent = Intent(context, AlarmActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            putExtra("alarmId", alarmId)
         }
-
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            alarmIntent,
+        val fullScreenPi = PendingIntent.getActivity(
+            context, alarmId.hashCode(), fullScreenIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, channelId)
-            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm) // 標準アラームアイコン
-            .setContentTitle("⏰ アラーム")
-            .setContentText("時間になりました！")
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setCategory(NotificationCompat.CATEGORY_ALARM)
-            .setFullScreenIntent(pendingIntent, true)
-            .setAutoCancel(true)
+        val stopPi = PendingIntent.getService(
+            context, ("stop$alarmId").hashCode(),
+            Intent(context, AlarmRingtoneService::class.java).apply {
+                action = AlarmRingtoneService.ACTION_STOP
+                putExtra("alarmId", alarmId)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
-        NotificationManagerCompat.from(context).notify(1001, builder.build())
+
+        val snoozePi = PendingIntent.getService(
+            context, ("snooze$alarmId").hashCode(),
+            Intent(context, AlarmRingtoneService::class.java).apply {
+                action = AlarmRingtoneService.ACTION_SNOOZE
+                putExtra("alarmId", alarmId)
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notif = NotificationCompat.Builder(context, "alarm_channel")
+            .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+            .setContentTitle("アラーム")
+            .setContentText("アラームが鳴っています")
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setFullScreenIntent(fullScreenPi, true)   // ★ ロック画面でも前面化
+            .addAction(0, "停止", stopPi)              // ★ 画面OFFのまま停止も可能
+            .build()
+
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(alarmId.hashCode(), notif)
     }
 }
