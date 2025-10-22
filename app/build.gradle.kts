@@ -55,6 +55,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.11.0")
     implementation("com.google.android.gms:play-services-base:18.5.0")
+    implementation("androidx.compose.ui:ui-text-google-fonts")
 
 
     testImplementation(libs.junit)

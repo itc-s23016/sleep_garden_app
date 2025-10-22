@@ -1,14 +1,22 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <!-- 端末により必要 -->
+
+    <!-- FGS 一般権限 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Android 14+ で明示（あれば） -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:ignore="ProtectedPermissions"/>
-
+    <!-- Android 13+ 通知 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 正確なアラーム（Android 12+） -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <!-- アラーム鳴動中にCPUを維持するため（MediaPlayerのwake lockで必須） -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- フルスクリーン通知（推奨、通常許可は自動付与） -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Android 14+ で mediaPlayback の FGS を使う場合に明示（推奨） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
+    <!-- ⚠️ 一般アプリでは使えないため削除してください
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    -->
 
     <application
         android:allowBackup="true"
@@ -28,23 +36,28 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <!-- 🔔 アラーム画面（AlarmActivity） -->
+
+        <!-- 🔔 アラーム停止UI（ロック画面でも前面表示） -->
         <activity
             android:name=".alarm.AlarmActivity"
             android:exported="true"
-            android:showOnLockScreen="true"
+            android:showWhenLocked="true"
             android:turnScreenOn="true" />
+
+        <!-- アラーム発火レシーバ（外部に公開不要なら false 推奨） -->
         <receiver
             android:name=".alarm.AlarmReceiver"
-            android:exported="true" />
+            android:exported="false" />
+
+        <!-- スヌーズレシーバ（外部に公開不要なら false 推奨） -->
+        <receiver
+            android:name=".alarm.SnoozeReceiver"
+            android:exported="false" />
+
+        <!-- 鳴動サービス：mediaPlayback のみを宣言（specialUse は不可） -->
         <service
             android:name=".alarm.AlarmRingtoneService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback|specialUse" />
-        <receiver
-            android:name=".alarm.SnoozeReceiver"
-            android:exported="true" />
-
+            android:foregroundServiceType="mediaPlayback" />
     </application>
-
 </manifest>
