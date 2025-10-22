@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "534696587253",
+    "project_id": "sleep-garden-app",
+    "storage_bucket": "sleep-garden-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:534696587253:android:2e7906b688e2ed9885fabc",
+        "android_client_info": {
+          "package_name": "com.example.sleep_garden"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC7K0ksFvMlXl95oEDa2cSoFcasozfHtL0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

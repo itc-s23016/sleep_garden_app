@@ -2,6 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+
+    // 👇 追加（モジュール側で適用）
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -51,6 +54,10 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.11.0")
+    implementation("com.google.android.gms:play-services-base:18.5.0")
+    implementation("androidx.compose.ui:ui-text-google-fonts")
+
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -58,4 +65,11 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+
+    // ---------------------------
+    // 👇 追加：Firebase (BoM + 各モジュール)
+    // ---------------------------
+    implementation(platform("com.google.firebase:firebase-bom:33.4.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-firestore-ktx")
 }
