@@ -36,13 +36,33 @@ class AlarmActivity : ComponentActivity() {
                         )
                         Spacer(Modifier.height(40.dp))
 
+                        // AlarmActivity.kt（停止ボタンの onClick だけ置き換え）
+
                         Button(
                             onClick = {
-                                sendServiceAction(AlarmRingtoneService.ACTION_STOP)
+                                // 1) 鳴動サービスを停止
+                                val alarmId = intent.getStringExtra("alarmId") ?: "default"
+                                val stop = Intent(this@AlarmActivity, AlarmRingtoneService::class.java).apply {
+                                    action = AlarmRingtoneService.ACTION_STOP
+                                    putExtra("alarmId", alarmId)
+                                }
+                                startService(stop)
+
+                                // 2) アプリ（MainActivity）を開く
+                                startActivity(
+                                    Intent(this@AlarmActivity, com.example.sleep_garden.MainActivity::class.java).apply {
+                                        // 既存タスクがあればそれを前面に、なければ新規
+                                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    }
+                                )
+
+                                // 3) このフルスクリーン画面は閉じる
                                 finish()
                             },
                             modifier = Modifier.fillMaxWidth(0.6f)
-                        ) { Text("停止") }
+                        ) {
+                            Text("停止")
+                        }
 
                         Spacer(Modifier.height(20.dp))
 
