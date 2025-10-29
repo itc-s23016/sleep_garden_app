@@ -21,7 +21,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -42,10 +41,11 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.sleep_garden.data.AlarmItem
-import com.example.sleep_garden.data.FirestoreAlarmRepository
+import com.example.sleep_garden.data.LocalAlarmRepository
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import kotlin.math.abs
+import kotlin.math.round
 
 class MainActivity : ComponentActivity() {
 
@@ -102,7 +102,6 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            // システム設定を初期値に
             val systemDark = isSystemInDarkTheme()
             var isDark by rememberSaveable { mutableStateOf(systemDark) }
             val scheme = if (isDark) darkColorScheme() else lightColorScheme()
@@ -110,19 +109,20 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = scheme) {
                 val context = LocalContext.current
                 val scope = rememberCoroutineScope()
-                val repo = remember { FirestoreAlarmRepository() }
+                val repo = remember { LocalAlarmRepository.getInstance(context) }
 
-                // Firestore: 複数アラーム購読
+                // SQLiteのアラーム一覧を購読
                 val alarms: List<AlarmItem> by remember(repo) { repo.observeAlarms() }
                     .collectAsState(initial = emptyList())
 
-                // 追加・編集用
+                // 追加・編集用（親が唯一のソース・オブ・トゥルース）
                 var pickerTargetId by remember { mutableStateOf<String?>(null) } // null=追加
                 var showPicker by remember { mutableStateOf(false) }
-                var tempHour by remember { mutableStateOf(7) }
-                var tempMinute by remember { mutableStateOf(0) }
+                val nowInit = remember { Calendar.getInstance() }
+                var tempHour by remember { mutableStateOf(nowInit.get(Calendar.HOUR_OF_DAY)) }
+                var tempMinute by remember { mutableStateOf(nowInit.get(Calendar.MINUTE)) }
 
-                // Firestore状態で冪等同期
+                // 端末側のスケジュール同期
                 LaunchedEffect(alarms) {
                     alarms.forEach { a ->
                         if (a.enabled) scheduleAlarm(context, a.id, a.hour, a.minute)
@@ -135,7 +135,6 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
                             title = { Text("アラーム") },
                             actions = {
-                                // ダーク/ライト切替（独自アイコン）
                                 IconButton(onClick = { isDark = !isDark }) {
                                     Icon(
                                         painter = painterResource(
@@ -145,11 +144,9 @@ class MainActivity : ComponentActivity() {
                                         contentDescription = if (isDark) "ライトモードに切替" else "ダークモードに切替"
                                     )
                                 }
-                                // アラーム音量（システム UI）
                                 IconButton(onClick = { showAlarmVolumePanel(context) }) {
                                     Icon(Icons.Filled.Notifications, contentDescription = "アラーム音量")
                                 }
-                                // 追加
                                 IconButton(onClick = {
                                     val now = Calendar.getInstance()
                                     pickerTargetId = null
@@ -178,7 +175,10 @@ class MainActivity : ComponentActivity() {
                                 contentPadding = PaddingValues(12.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(alarms, key = { it.id }) { alarm ->
+                                items(
+                                    items = alarms,
+                                    key = { it.id }
+                                ) { alarm ->
                                     AlarmRow(
                                         alarm = alarm,
                                         onToggle = { checked ->
@@ -207,29 +207,34 @@ class MainActivity : ComponentActivity() {
                     }
 
                     if (showPicker) {
-                        WheelTimePickerDialog(
-                            initialHour = tempHour,
-                            initialMinute = tempMinute,
-                            isDark = isDark,                 // ← ダーク状態を渡す
-                            onDismiss = { showPicker = false },
-                            onConfirm = { h, m ->
-                                showPicker = false
-                                scope.launch {
-                                    if (pickerTargetId == null) {
-                                        val id = repo.addAlarm(h, m, enabled = true)
-                                        scheduleAlarm(context, id, h, m)
-                                        Toast.makeText(context, "アラームを追加しました", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        val id = pickerTargetId!!
-                                        repo.updateTime(id, h, m)
-                                        alarms.find { it.id == id }?.let { item ->
-                                            if (item.enabled) scheduleAlarm(context, id, h, m)
+                        val dialogKey = pickerTargetId ?: "add"
+                        androidx.compose.runtime.key(dialogKey) {
+                            WheelTimePickerDialog(
+                                hour = tempHour,
+                                minute = tempMinute,
+                                isDark = isDark,
+                                onHourChange = { tempHour = it },
+                                onMinuteChange = { tempMinute = it },
+                                onDismiss = { showPicker = false },
+                                onConfirm = {
+                                    showPicker = false
+                                    scope.launch {
+                                        if (pickerTargetId == null) {
+                                            val id = repo.addAlarm(tempHour, tempMinute, enabled = true)
+                                            scheduleAlarm(context, id, tempHour, tempMinute)
+                                            Toast.makeText(context, "アラームを追加しました", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            val id = pickerTargetId!!
+                                            repo.updateTime(id, tempHour, tempMinute)
+                                            alarms.find { it.id == id }?.let { item ->
+                                                if (item.enabled) scheduleAlarm(context, id, tempHour, tempMinute)
+                                            }
+                                            Toast.makeText(context, "時刻を更新しました", Toast.LENGTH_SHORT).show()
                                         }
-                                        Toast.makeText(context, "時刻を更新しました", Toast.LENGTH_SHORT).show()
                                     }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             }
@@ -293,19 +298,18 @@ private fun cancelAlarm(context: Context, alarmId: String) {
     alarmManager.cancel(pending)
 }
 
-/* ---------- ホイール（Compose実装）版の時間ダイアログ ---------- */
+/* ---------- ホイール（Compose） ---------- */
 
 @Composable
 fun WheelTimePickerDialog(
-    initialHour: Int,
-    initialMinute: Int,
+    hour: Int,
+    minute: Int,
     isDark: Boolean,
+    onHourChange: (Int) -> Unit,
+    onMinuteChange: (Int) -> Unit,
     onDismiss: () -> Unit,
-    onConfirm: (Int, Int) -> Unit,
+    onConfirm: () -> Unit,
 ) {
-    var hour by remember { mutableStateOf(initialHour.coerceIn(0, 23)) }
-    var minute by remember { mutableStateOf(initialMinute.coerceIn(0, 59)) }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("時間を選択") },
@@ -317,22 +321,20 @@ fun WheelTimePickerDialog(
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // 時（0..23）
                 Wheel(
                     range = 0..23,
                     value = hour,
-                    onValueChange = { hour = it },
+                    onValueChange = onHourChange,
                     formatter = { "%02d".format(it) },
                     isDark = isDark,
                     modifier = Modifier
                         .weight(1f)
                         .height(200.dp)
                 )
-                // 分（0..59）
                 Wheel(
                     range = 0..59,
                     value = minute,
-                    onValueChange = { minute = it },
+                    onValueChange = onMinuteChange,
                     formatter = { "%02d".format(it) },
                     isDark = isDark,
                     modifier = Modifier
@@ -341,12 +343,8 @@ fun WheelTimePickerDialog(
                 )
             }
         },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(hour, minute) }) { Text("決定") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("キャンセル") }
-        }
+        confirmButton = { TextButton(onClick = onConfirm) { Text("決定") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("キャンセル") } }
     )
 }
 
@@ -358,73 +356,80 @@ private fun Wheel(
     formatter: (Int) -> String,
     isDark: Boolean,
     modifier: Modifier = Modifier,
-    visibleCount: Int = 5,        // 中央1行 + 上下同数（奇数）
+    visibleCount: Int = 5,
     itemHeight: Dp = 40.dp
 ) {
-    val items = remember(range) { range.toList() }
+    val values = remember(range) { range.toList() }
     val centerOffset = visibleCount / 2
-    val wantedIndex = (value - range.first).coerceIn(0, items.lastIndex)
-
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = (wantedIndex - centerOffset).coerceAtLeast(0)
-    )
 
     val density = LocalDensity.current
     val itemHpx = with(density) { itemHeight.toPx() }
 
-    // ❶ スナップ挙動（Compose Foundation）
-    val flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(
-        lazyListState = listState
+    // 初期位置（値の行が中央に来るように：先頭をその値に）
+    val initialIndex = (value - range.first).coerceIn(0, values.lastIndex)
+    val listState = rememberLazyListState(
+        initialFirstVisibleItemIndex = initialIndex,
+        initialFirstVisibleItemScrollOffset = 0
     )
 
-    // ❷ 初期位置合わせは一度だけ（ドリフト防止）
-    LaunchedEffect(Unit) {
-        listState.scrollToItem((wantedIndex - centerOffset).coerceAtLeast(0))
+    // 外部の value が変わったら中央に再合わせ
+    LaunchedEffect(value, range) {
+        val i = (value - range.first).coerceIn(0, values.lastIndex)
+        listState.scrollToItem(i, 0)
     }
 
-    // ❸ 中央行のインデックスを算出（常に Int 計算）
+    // ビューポート中央に最も近い“実アイテム”を選ぶ（上下ダミー行あり）
     val selectedIndex by remember {
         derivedStateOf {
             val info = listState.layoutInfo
-            if (info.visibleItemsInfo.isEmpty()) {
-                wantedIndex
-            } else {
-                val start: Int = info.viewportStartOffset
-                val end: Int = info.viewportEndOffset
-                val center: Int = start + (end - start) / 2
+            val visibles = info.visibleItemsInfo
+            if (visibles.isEmpty()) return@derivedStateOf initialIndex
 
-                val nearest = info.visibleItemsInfo.minByOrNull { item: LazyListItemInfo ->
-                    val itemCenter: Int = item.offset + item.size / 2
-                    kotlin.math.abs(itemCenter - center)
-                }
-                (nearest?.index ?: wantedIndex).coerceIn(0, items.lastIndex)
-            }
+            val viewportCenter = info.viewportStartOffset +
+                    (info.viewportEndOffset - info.viewportStartOffset) / 2f
+
+            val nearest = visibles.minByOrNull { item ->
+                val center = item.offset + item.size / 2f
+                kotlin.math.abs(center - viewportCenter)
+            } ?: return@derivedStateOf initialIndex
+
+            // ダミー行の分（centerOffset）を引いて実データのindexに戻す
+            (nearest.index - centerOffset).coerceIn(0, values.lastIndex)
         }
     }
 
-    // ❹ 中央行が変わったときだけ外へ通知（無限ループを避ける）
+    // 値通知（選択が変わったら親へ）
     LaunchedEffect(selectedIndex) {
-        val newValue = items[selectedIndex]
+        val newValue = values[selectedIndex]
         if (newValue != value) onValueChange(newValue)
     }
 
-    val lineColor = if (isDark) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
+    // スクロール停止時は必ず行境界に吸着（微妙な位置で止まらない）
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            val off = listState.firstVisibleItemScrollOffset.toFloat()
+            val down = (off >= itemHpx / 2f)
+            val target = listState.firstVisibleItemIndex + if (down) 1 else 0
+            listState.animateScrollToItem(target, 0)
+        }
+    }
+
+    val lineColor =
+        if (isDark) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
     val textColor = MaterialTheme.colorScheme.onSurface
-    val verticalPad: Dp = itemHeight * centerOffset
 
     Box(modifier = modifier) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = verticalPad, bottom = verticalPad),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-            flingBehavior = flingBehavior // ← スナップを適用
+            modifier = Modifier.fillMaxSize()
         ) {
-            items(
-                count = items.size,
-                key = { idx -> items[idx] }
-            ) { i ->
-                // 「今の中央項目か」で強調を切り替え
+            // 上ダミー行（見かけのパディング）
+            items(count = centerOffset) {
+                Box(Modifier.fillMaxWidth().height(itemHeight))
+            }
+
+            // 実データ
+            items(values.size, key = { idx -> values[idx] }) { i ->
                 val selected = (i == selectedIndex)
                 Box(
                     modifier = Modifier
@@ -433,7 +438,7 @@ private fun Wheel(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = formatter(items[i]),
+                        text = formatter(values[i]),
                         color = if (selected) textColor else textColor.copy(alpha = 0.6f),
                         style = if (selected)
                             MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
@@ -442,20 +447,28 @@ private fun Wheel(
                     )
                 }
             }
+
+            // 下ダミー行
+            items(count = centerOffset) {
+                Box(Modifier.fillMaxWidth().height(itemHeight))
+            }
         }
 
-        // 中央の2本ライン（外側のみ）
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val yTop = size.height / 2f - itemHpx / 2f
-            val yBottom = size.height / 2f + itemHpx / 2f
-            val stroke = with(density) { 2.dp.toPx() }
-            drawLine(lineColor, Offset(0f, yTop), Offset(size.width, yTop), stroke)
-            drawLine(lineColor, Offset(0f, yBottom), Offset(size.width, yBottom), stroke)
+        // 中央の2本線（正確に中央へ）
+        Column(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .height(itemHeight)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Divider(color = lineColor, thickness = 2.dp)
+            Divider(color = lineColor, thickness = 2.dp)
         }
     }
 }
 
-/** システムの音量UIを開いて、アラーム音量を調節させる */
+/** システムの音量UIを開く（アラーム音量） */
 private fun showAlarmVolumePanel(context: Context) {
     val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     am.adjustStreamVolume(
@@ -465,7 +478,7 @@ private fun showAlarmVolumePanel(context: Context) {
     )
 }
 
-/* ---- 一覧行 ---- */
+/* ---- アラーム一覧の行 ---- */
 @Composable
 private fun AlarmRow(
     alarm: AlarmItem,
