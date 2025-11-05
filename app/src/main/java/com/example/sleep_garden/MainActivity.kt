@@ -8,6 +8,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -28,17 +29,23 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.sleep_garden.data.XpRepository
+import kotlin.math.max
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             val systemDark = isSystemInDarkTheme()
             var isDark by rememberSaveable { mutableStateOf(systemDark) }
@@ -52,11 +59,11 @@ class MainActivity : ComponentActivity() {
                             isDark = isDark,
                             onToggleTheme = { isDark = !isDark },
                             onAlarmClick = { nav.navigate("alarm") },
-                            onDexClick = { /* TODO */ },
-                            onSleepClick = { /* HomeScreen 内でオーバーレイ表示 */ }
+                            onDexClick   = { /* TODO: 図鑑へ */ }
                         )
                     }
                     composable("alarm") {
+                        // 既存の AlarmScreen(Compose) がある前提
                         com.example.sleep_garden.alarm.AlarmScreen(
                             onBack = { nav.popBackStack() },
                             isDark = isDark,
@@ -69,7 +76,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/* ---------------- Home：下端そろえ（安全エリア最下端に吸着） ---------------- */
+/* ================= Home：XPバー + ボタン群 + 寝るオーバーレイ + 獲得ポップアップ ================= */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,11 +84,44 @@ private fun HomeScreen(
     isDark: Boolean,
     onToggleTheme: () -> Unit,
     onAlarmClick: () -> Unit,
-    onDexClick: () -> Unit,
-    onSleepClick: () -> Unit
+    onDexClick: () -> Unit
 ) {
-    // 追加：おやすみオーバーレイの表示フラグ
-    var showSleep by remember { mutableStateOf(false) }
+    val ctx = LocalContext.current
+    val xpRepo = remember { XpRepository.getInstance(ctx) }
+
+    var level by remember { mutableStateOf(xpRepo.getLevel()) }
+    var currentXp by remember { mutableStateOf(xpRepo.getXp()) }
+    var nextReq by remember { mutableStateOf(xpRepo.getRequiredXpFor(level)) }
+
+    var sleepStartAt by rememberSaveable { mutableStateOf<Long?>(null) }
+
+    var showGained by remember { mutableStateOf(false) }
+    var gainedAmount by remember { mutableStateOf(0) }
+
+    var showSleepOverlay by remember { mutableStateOf(false) }
+
+    val progress = remember(level, currentXp, nextReq) {
+        if (level >= XpRepository.MAX_LEVEL) 1f
+        else if (nextReq <= 0) 0f
+        else (currentXp.toFloat() / nextReq.toFloat()).coerceIn(0f, 1f)
+    }
+
+    // 起きる処理（下段ボタン／オーバーレイどちらからでも呼ぶ）
+    fun performWake() {
+        val end = System.currentTimeMillis()
+        val minutes = max(0, ((end - (sleepStartAt ?: end)) / 60_000L).toInt())
+        val (added, newLevel, newXp, newReq, _) = xpRepo.addXpAndLevelUp(minutes /* 1分=1XP */)
+
+        level = newLevel
+        currentXp = newXp
+        nextReq = newReq
+
+        gainedAmount = added
+        showGained = true
+
+        sleepStartAt = null
+        showSleepOverlay = false
+    }
 
     Scaffold(
         topBar = {
@@ -112,146 +152,148 @@ private fun HomeScreen(
                 contentScale = ContentScale.Crop
             )
 
-            // ===== 画面最下端（安全エリア下端）にボタン群を吸着 =====
-            BoxWithConstraints(
-                modifier = Modifier.fillMaxSize()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                // 少し大きめに（前: 1.08f）
-                val buttonScale = 1.18f   // 1.12〜1.22 の範囲でお好み調整OK
-
-                val rowBtnHeight  = (maxWidth * 0.24f * buttonScale).coerceIn(120.dp, 208.dp)
-                val wideBtnHeight = (maxWidth * 0.22f * buttonScale).coerceIn(110.dp, 196.dp)
-
-                // 見切れ防止の内側余白は少し抑えめ（大きくした分だけ絵柄を広く見せる）
-                val innerPadRow   = rowBtnHeight * 0.09f   // 前: 0.10f
-                val innerPadWide  = wideBtnHeight * 0.09f  // 前: 0.10f
-
-                Column(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)  // 最下端そろえ
-                        .navigationBarsPadding()         // システムバー分だけ上に逃がす
-                        .offset(y = 10.dp)               // ★ 全体を少し下へ
-                        .padding(bottom = 0.dp),
-                    verticalArrangement = Arrangement.Bottom,
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // === 上部：レベル表示 + XPバー（見やすさ向上済み） ===
+                Surface(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                    shape = RoundedCornerShape(14.dp),
+                    tonalElevation = 2.dp,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    // 上段2ボタン（左右を広く）
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .offset(y = 17.dp)             // 上段だけ少し下げる
-                            .padding(horizontal = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        ImageButton(
-                            resId = R.drawable.btn_alarm,
-                            contentDesc = "アラーム・種植え",
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Lv $level",
+                                color = MaterialTheme.colorScheme.onSurface,
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                            )
+                            if (level < XpRepository.MAX_LEVEL) {
+                                Text(
+                                    text = "${currentXp} / $nextReq XP",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            } else {
+                                Text(
+                                    text = "MAX",
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    style = MaterialTheme.typography.titleMedium
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        LinearProgressIndicator(
+                            progress = progress,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
                             modifier = Modifier
-                                .weight(1f)
-                                .height(rowBtnHeight),
-                            corner = 20.dp,
-                            contentPadding = innerPadRow,
-                            onClick = onAlarmClick
-                        )
-                        ImageButton(
-                            resId = R.drawable.btn_dex,
-                            contentDesc = "花図鑑",
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(rowBtnHeight),
-                            corner = 20.dp,
-                            contentPadding = innerPadRow,
-                            onClick = onDexClick
+                                .fillMaxWidth()
+                                .height(14.dp)
+                                .clip(RoundedCornerShape(8.dp))
                         )
                     }
+                }
 
-                    // 下段ワイドボタン（左右を広く）
-                    ImageButton(
-                        resId = R.drawable.btn_sleep,
-                        contentDesc = "寝る・成長",
+                // === 下部：上2 / 下1 のボタン配置（元レイアウト） ===
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val buttonScale = 1.18f
+                    val rowBtnHeight  = (maxWidth * 0.24f * buttonScale).coerceIn(120.dp, 208.dp)
+                    val wideBtnHeight = (maxWidth * 0.22f * buttonScale).coerceIn(110.dp, 196.dp)
+                    val innerPadRow   = rowBtnHeight * 0.09f
+                    val innerPadWide  = wideBtnHeight * 0.09f
+
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 10.dp)
-                            .height(wideBtnHeight),
-                        corner = 22.dp,
-                        contentPadding = innerPadWide
+                            .navigationBarsPadding()
+                            .offset(y = 10.dp),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        showSleep = true     // ← フルスクリーンの“おやすみ”を表示
-                        onSleepClick()
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .offset(y = 17.dp)
+                                .padding(horizontal = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ImageButton(
+                                resId = R.drawable.btn_alarm,
+                                contentDesc = "アラーム・種植え",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(rowBtnHeight),
+                                corner = 20.dp,
+                                contentPadding = innerPadRow,
+                                onClick = onAlarmClick
+                            )
+                            ImageButton(
+                                resId = R.drawable.btn_dex,
+                                contentDesc = "花図鑑",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(rowBtnHeight),
+                                corner = 20.dp,
+                                contentPadding = innerPadRow,
+                                onClick = onDexClick
+                            )
+                        }
+
+                        ImageButton(
+                            resId = if (sleepStartAt == null) R.drawable.btn_sleep else R.drawable.btn_wake,
+                            contentDesc = if (sleepStartAt == null) "寝る" else "起きる",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp)
+                                .height(wideBtnHeight),
+                            corner = 22.dp,
+                            contentPadding = innerPadWide
+                        ) {
+                            if (sleepStartAt == null) {
+                                // 寝る開始
+                                sleepStartAt = System.currentTimeMillis()
+                                showSleepOverlay = true
+                            } else {
+                                // 起きる（下段ボタン）
+                                performWake()
+                            }
+                        }
                     }
                 }
             }
 
-            // 追加：おやすみオーバーレイ
+            // 寝ている間のオーバーレイ（最前面 / 起きるで performWake）
             SleepOverlay(
-                visible = showSleep,
-                onWake = { showSleep = false }
+                visible = showSleepOverlay,
+                onWakeClick = {
+                    if (sleepStartAt != null) performWake()
+                }
             )
-        }
-    }
-}
 
-/* ---------------- フルスクリーンの“おやすみ”表示 + 起きる画像ボタン ---------------- */
-
-@Composable
-private fun SleepOverlay(
-    visible: Boolean,
-    onWake: () -> Unit
-) {
-    if (!visible) return
-
-    val alphaAnim = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        alphaAnim.animateTo(1f, tween(300))
-        alphaAnim.animateTo(0.9f, tween(1200))
-    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .alpha(alphaAnim.value)
-    ) {
-        Image(
-            painter = painterResource(R.drawable.sleep_overlay),
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
-        )
-
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .navigationBarsPadding()
-        ) {
-            val w = (maxWidth * 0.90f).coerceIn(220.dp, 500.dp)
-            val h = w * (118f / 362f)
-
-            // ↓ 画像を大きくする：余白を小さく（前: 0.14f）
-            val innerPad = h * 0.01f   // 0.04f〜0.08fの範囲で微調整OK
-
-            Box(
-                modifier = Modifier
-                    .size(width = w, height = h)
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 48.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClick = onWake)
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.btn_wake),
-                    contentDescription = "起きる",
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(innerPad),
-                    contentScale = ContentScale.Fit
+            // 獲得XPポップアップ（どこでもタップで閉じる）
+            if (showGained) {
+                GainedXpPopup(
+                    gained = gainedAmount,
+                    newLevel = level,
+                    currentXp = currentXp,
+                    nextReq = nextReq,
+                    onDismiss = { showGained = false }
                 )
             }
         }
     }
 }
 
-
-/* ---------------- 画像そのものを押せるボタン（中身は余白で縮小） ---------------- */
+/* ---------------- 画像ボタン（拡大縮小の押下演出つき） ---------------- */
 
 @Composable
 private fun ImageButton(
@@ -272,7 +314,7 @@ private fun ImageButton(
             .clip(RoundedCornerShape(corner))
             .indication(interaction, ripple())
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(contentPadding) // 画像だけ一回り内側へ（見切れ防止）
+            .padding(contentPadding)
     ) {
         Image(
             painter = painterResource(resId),
@@ -281,5 +323,134 @@ private fun ImageButton(
             contentScale = ContentScale.Fit,
             alignment = Alignment.Center
         )
+    }
+}
+
+/* ---------------- フルスクリーン “おやすみ” オーバーレイ（起きるボタンあり） ---------------- */
+
+@Composable
+private fun SleepOverlay(
+    visible: Boolean,
+    onWakeClick: () -> Unit
+) {
+    if (!visible) return
+
+    val alphaAnim = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        alphaAnim.animateTo(1f, tween(200))
+        alphaAnim.animateTo(0.92f, tween(1000))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(10f)              // 最前面
+            .alpha(alphaAnim.value)
+    ) {
+        Image(
+            painter = painterResource(R.drawable.sleep_overlay),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+        ) {
+            val w = (maxWidth * 0.90f).coerceIn(220.dp, 500.dp)
+            val h = w * (118f / 362f)
+            val innerPad = h * 0.01f
+
+            Box(
+                modifier = Modifier
+                    .size(width = w, height = h)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onWakeClick)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.btn_wake),
+                    contentDescription = "起きる",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPad),
+                    contentScale = ContentScale.Fit
+                )
+            }
+        }
+    }
+}
+
+/* ---------------- 獲得XPポップアップ ---------------- */
+
+@Composable
+private fun GainedXpPopup(
+    gained: Int,
+    newLevel: Int,
+    currentXp: Int,
+    nextReq: Int,
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(20f)
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .padding(24.dp)
+                .clickable(enabled = false) { } // 中もタップで閉じたいなら削除
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "獲得XP",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "+$gained XP",
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    text = "現在レベル：Lv $newLevel",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                if (newLevel < XpRepository.MAX_LEVEL) {
+                    Text(
+                        text = "次のレベルまで：${(nextReq - currentXp).coerceAtLeast(0)} XP",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                } else {
+                    Text(
+                        text = "レベルは最大です",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "どこでもタップで閉じる",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
