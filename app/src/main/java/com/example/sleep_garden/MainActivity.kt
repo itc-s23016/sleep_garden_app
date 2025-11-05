@@ -4,7 +4,9 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
@@ -22,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -50,7 +53,7 @@ class MainActivity : ComponentActivity() {
                             onToggleTheme = { isDark = !isDark },
                             onAlarmClick = { nav.navigate("alarm") },
                             onDexClick = { /* TODO */ },
-                            onSleepClick = { /* TODO */ }
+                            onSleepClick = { /* HomeScreen 内でオーバーレイ表示 */ }
                         )
                     }
                     composable("alarm") {
@@ -77,6 +80,9 @@ private fun HomeScreen(
     onDexClick: () -> Unit,
     onSleepClick: () -> Unit
 ) {
+    // 追加：おやすみオーバーレイの表示フラグ
+    var showSleep by remember { mutableStateOf(false) }
+
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
@@ -116,16 +122,15 @@ private fun HomeScreen(
                 val rowBtnHeight  = (maxWidth * 0.24f * buttonScale).coerceIn(120.dp, 208.dp)
                 val wideBtnHeight = (maxWidth * 0.22f * buttonScale).coerceIn(110.dp, 196.dp)
 
-// 見切れ防止の内側余白は少し抑えめ（大きくした分だけ絵柄を広く見せる）
+                // 見切れ防止の内側余白は少し抑えめ（大きくした分だけ絵柄を広く見せる）
                 val innerPadRow   = rowBtnHeight * 0.09f   // 前: 0.10f
                 val innerPadWide  = wideBtnHeight * 0.09f  // 前: 0.10f
-
 
                 Column(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)  // 最下端そろえ
                         .navigationBarsPadding()         // システムバー分だけ上に逃がす
-                        .offset(y = 10.dp)                // ★ 全体を3dpだけ下へ
+                        .offset(y = 10.dp)               // ★ 全体を少し下へ
                         .padding(bottom = 0.dp),
                     verticalArrangement = Arrangement.Bottom,
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -134,7 +139,7 @@ private fun HomeScreen(
                     Row(
                         Modifier
                             .fillMaxWidth()
-                            .offset(y = 17.dp)
+                            .offset(y = 17.dp)             // 上段だけ少し下げる
                             .padding(horizontal = 6.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
@@ -169,14 +174,82 @@ private fun HomeScreen(
                             .padding(horizontal = 10.dp)
                             .height(wideBtnHeight),
                         corner = 22.dp,
-                        contentPadding = innerPadWide,
-                        onClick = onSleepClick
-                    )
+                        contentPadding = innerPadWide
+                    ) {
+                        showSleep = true     // ← フルスクリーンの“おやすみ”を表示
+                        onSleepClick()
+                    }
                 }
+            }
+
+            // 追加：おやすみオーバーレイ
+            SleepOverlay(
+                visible = showSleep,
+                onWake = { showSleep = false }
+            )
+        }
+    }
+}
+
+/* ---------------- フルスクリーンの“おやすみ”表示 + 起きる画像ボタン ---------------- */
+
+@Composable
+private fun SleepOverlay(
+    visible: Boolean,
+    onWake: () -> Unit
+) {
+    if (!visible) return
+
+    val alphaAnim = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        alphaAnim.animateTo(1f, tween(300))
+        alphaAnim.animateTo(0.9f, tween(1200))
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .alpha(alphaAnim.value)
+    ) {
+        Image(
+            painter = painterResource(R.drawable.sleep_overlay),
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxSize()
+                .navigationBarsPadding()
+        ) {
+            val w = (maxWidth * 0.90f).coerceIn(220.dp, 500.dp)
+            val h = w * (118f / 362f)
+
+            // ↓ 画像を大きくする：余白を小さく（前: 0.14f）
+            val innerPad = h * 0.01f   // 0.04f〜0.08fの範囲で微調整OK
+
+            Box(
+                modifier = Modifier
+                    .size(width = w, height = h)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onWake)
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.btn_wake),
+                    contentDescription = "起きる",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPad),
+                    contentScale = ContentScale.Fit
+                )
             }
         }
     }
 }
+
 
 /* ---------------- 画像そのものを押せるボタン（中身は余白で縮小） ---------------- */
 
