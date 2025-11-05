@@ -1,22 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- FGS 一般権限 -->
+    <!-- 前景サービス（アラーム鳴動で使用） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Android 13+ 通知 -->
+    <!-- Android 14+ で mediaPlayback を使う場合の宣言（推奨） -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- 通知（Android 13+） -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- 正確なアラーム（Android 12+） -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    <!-- アラーム鳴動中にCPUを維持するため（MediaPlayerのwake lockで必須） -->
+    <!-- 鳴動中の WakeLock 用 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- フルスクリーン通知（推奨、通常許可は自動付与） -->
+    <!-- フルスクリーン通知（推奨） -->
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
-    <!-- Android 14+ で mediaPlayback の FGS を使う場合に明示（推奨） -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-
-    <!-- ⚠️ 一般アプリでは使えないため削除してください
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    -->
+    <!-- 画面オーバーレイに必要（設定で許可が必要） -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="true"
@@ -44,20 +43,25 @@
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
 
-        <!-- アラーム発火レシーバ（外部に公開不要なら false 推奨） -->
+        <!-- アラーム発火レシーバ -->
         <receiver
             android:name=".alarm.AlarmReceiver"
             android:exported="false" />
 
-        <!-- スヌーズレシーバ（外部に公開不要なら false 推奨） -->
+        <!-- スヌーズレシーバ -->
         <receiver
             android:name=".alarm.SnoozeReceiver"
             android:exported="false" />
 
-        <!-- 鳴動サービス：mediaPlayback のみを宣言（specialUse は不可） -->
+        <!-- 鳴動サービス（mediaPlayback の前景サービス） -->
         <service
             android:name=".alarm.AlarmRingtoneService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback" />
+
+        <!-- 🌙 おやすみオーバーレイ（通常サービス。前景化しない） -->
+        <service
+            android:name=".sleep.SleepOverlayService"
+            android:exported="false" />
     </application>
 </manifest>

@@ -1,12 +1,11 @@
 package com.example.sleep_garden
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,7 +24,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -43,8 +41,12 @@ import kotlin.math.max
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // ★ 次回起動時のスタート画面を決める（睡眠中なら "sleep"）
+        val initialRoute = if (isSleepActive(this)) "sleep" else "home"
 
         setContent {
             val systemDark = isSystemInDarkTheme()
@@ -53,15 +55,42 @@ class MainActivity : ComponentActivity() {
 
             MaterialTheme(colorScheme = scheme) {
                 val nav = rememberNavController()
-                NavHost(navController = nav, startDestination = "home") {
+
+                NavHost(navController = nav, startDestination = initialRoute) {
+
+                    // Home
                     composable("home") {
                         HomeScreen(
                             isDark = isDark,
                             onToggleTheme = { isDark = !isDark },
                             onAlarmClick = { nav.navigate("alarm") },
-                            onDexClick   = { /* TODO: 図鑑へ */ }
+
+                            onDexClick = { /* TODO: 図鑑 */ },
+                            onSleepClick = {
+                                // ★ 睡眠フラグONにして sleep 画面へ遷移
+                                setSleepActive(applicationContext, true)
+                                nav.navigate("sleep") {
+                                    launchSingleTop = true
+                                }
+                            }
                         )
                     }
+
+                    // スリープ画面（アプリ内フルスクリーン表示）
+                    composable("sleep") {
+                        SleepScreen(
+                            onWake = {
+                                // ★ 起きる：フラグOFF → Homeへ
+                                setSleepActive(applicationContext, false)
+                                nav.navigate("home") {
+                                    launchSingleTop = true
+                                    popUpTo("home") { inclusive = true } // Homeを一枚だけに
+                                }
+                            }
+                        )
+                    }
+
+                    // 既存アラーム画面
                     composable("alarm") {
                         // 既存の AlarmScreen(Compose) がある前提
                         com.example.sleep_garden.alarm.AlarmScreen(
@@ -128,7 +157,7 @@ private fun HomeScreen(
             CenterAlignedTopAppBar(
                 title = { Text("睡眠花育成", style = MaterialTheme.typography.titleLarge) },
                 actions = {
-                    IconButton(onClick = { /* アラーム音量はアラーム画面で */ }) {
+                    IconButton(onClick = { /* アラーム音量UIはアラーム画面で */ }) {
                         Icon(Icons.Filled.Notifications, contentDescription = "アラーム音量")
                     }
                     IconButton(onClick = onToggleTheme) {
@@ -195,6 +224,7 @@ private fun HomeScreen(
                             progress = progress,
                             color = MaterialTheme.colorScheme.primary,
                             trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(14.dp)
@@ -328,40 +358,34 @@ private fun ImageButton(
 
 /* ---------------- フルスクリーン “おやすみ” オーバーレイ（起きるボタンあり） ---------------- */
 
+
+
+
+/* ---------------- スリープ画面（アプリ内フルスクリーン + 起きるボタン） ---------------- */
+
 @Composable
-private fun SleepOverlay(
-    visible: Boolean,
-    onWakeClick: () -> Unit
+private fun SleepScreen(
+    onWake: () -> Unit
 ) {
-    if (!visible) return
-
-    val alphaAnim = remember { Animatable(0f) }
-    LaunchedEffect(Unit) {
-        alphaAnim.animateTo(1f, tween(200))
-        alphaAnim.animateTo(0.92f, tween(1000))
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .zIndex(10f)              // 最前面
-            .alpha(alphaAnim.value)
+            .navigationBarsPadding()
     ) {
         Image(
             painter = painterResource(R.drawable.sleep_overlay),
-            contentDescription = null,
+            contentDescription = "sleep overlay",
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
 
         BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .navigationBarsPadding()
+            modifier = Modifier.fillMaxSize()
         ) {
             val w = (maxWidth * 0.90f).coerceIn(220.dp, 500.dp)
             val h = w * (118f / 362f)
-            val innerPad = h * 0.01f
+
+            val innerPad = h * 0.02f
 
             Box(
                 modifier = Modifier
@@ -385,6 +409,7 @@ private fun SleepOverlay(
 }
 
 /* ---------------- 獲得XPポップアップ ---------------- */
+
 
 @Composable
 private fun GainedXpPopup(
@@ -453,4 +478,17 @@ private fun GainedXpPopup(
             }
         }
     }
+}
+
+/* ---------------- シンプルな永続フラグ（睡眠中かどうか） ---------------- */
+
+private fun isSleepActive(ctx: Context): Boolean =
+    ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
+        .getBoolean("sleep_active", false)
+
+private fun setSleepActive(ctx: Context, value: Boolean) {
+    ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean("sleep_active", value)
+        .apply()
 }
