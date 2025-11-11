@@ -46,6 +46,10 @@ import com.example.sleep_garden.data.FirestoreAlarmRepository
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import kotlin.math.abs
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilledTonalButton
 
 class MainActivity : ComponentActivity() {
 
@@ -106,8 +110,21 @@ class MainActivity : ComponentActivity() {
             val systemDark = isSystemInDarkTheme()
             var isDark by rememberSaveable { mutableStateOf(systemDark) }
             val scheme = if (isDark) darkColorScheme() else lightColorScheme()
+            var showZukan by rememberSaveable { mutableStateOf(false) }
 
             MaterialTheme(colorScheme = scheme) {
+                //図鑑移行ボタン
+                if (showZukan) {
+                    Box(Modifier.fillMaxSize()) {
+                        Zukan()
+                        FilledTonalButton(
+                            onClick = { showZukan = false },
+                            modifier = Modifier.padding(100.dp,20.dp).align(Alignment.TopStart)
+                        ) { Text("戻る") }
+                    }
+                    return@MaterialTheme
+                }
+                //ここまで図鑑移行ボタン
                 val context = LocalContext.current
                 val scope = rememberCoroutineScope()
                 val repo = remember { FirestoreAlarmRepository() }
@@ -128,6 +145,7 @@ class MainActivity : ComponentActivity() {
                         if (a.enabled) scheduleAlarm(context, a.id, a.hour, a.minute)
                         else cancelAlarm(context, a.id)
                     }
+
                 }
 
                 Scaffold(
@@ -135,6 +153,8 @@ class MainActivity : ComponentActivity() {
                         TopAppBar(
                             title = { Text("アラーム") },
                             actions = {
+                                //図鑑へ
+                                TextButton(onClick = { showZukan = true }) { Text("図鑑") }
                                 // ダーク/ライト切替（独自アイコン）
                                 IconButton(onClick = { isDark = !isDark }) {
                                     Icon(

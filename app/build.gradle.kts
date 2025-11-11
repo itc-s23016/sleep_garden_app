@@ -56,6 +56,8 @@ dependencies {
     implementation("com.google.android.material:material:1.11.0")
     implementation("com.google.android.gms:play-services-base:18.5.0")
     implementation("androidx.compose.ui:ui-text-google-fonts")
+    implementation(libs.androidx.compose.foundation.layout)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
 
 
     testImplementation(libs.junit)
