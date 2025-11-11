@@ -1,254 +1,97 @@
 package com.example.sleep_garden
 
-import android.Manifest
-import android.app.AlarmManager
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.media.AudioManager
-import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListItemInfo
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.*
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import com.example.sleep_garden.data.AlarmItem
-import com.example.sleep_garden.data.FirestoreAlarmRepository
-import kotlinx.coroutines.launch
-import java.util.Calendar
-import kotlin.math.abs
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.FilledTonalButton
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import com.example.sleep_garden.data.XpRepository
+import kotlin.math.max
 
+@OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
 
-    private val requestNotificationPermission =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (!granted) {
-                Toast.makeText(this, "通知がオフだと気づけない可能性があります", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-    private val requestExactAlarmPermission =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
-                if (!alarmManager.canScheduleExactAlarms()) {
-                    Toast.makeText(this, "正確なアラームが許可されていません", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 通知権限（Android 13+）
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
-        }
-
-        // 正確なアラーム許可（Android 12+）
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = getSystemService(ALARM_SERVICE) as AlarmManager
-            if (!alarmManager.canScheduleExactAlarms()) {
-                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                    data = android.net.Uri.parse("package:$packageName")
-                }
-                requestExactAlarmPermission.launch(intent)
-            }
-        }
-
-        // 通知チャンネル
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                "alarm_channel", "アラーム通知", NotificationManager.IMPORTANCE_HIGH
-            )
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
-        }
+        // ★ 次回起動時のスタート画面を決める（睡眠中なら "sleep"）
+        val initialRoute = if (isSleepActive(this)) "sleep" else "home"
 
         setContent {
-            // システム設定を初期値に
             val systemDark = isSystemInDarkTheme()
             var isDark by rememberSaveable { mutableStateOf(systemDark) }
             val scheme = if (isDark) darkColorScheme() else lightColorScheme()
-            var showZukan by rememberSaveable { mutableStateOf(false) }
 
             MaterialTheme(colorScheme = scheme) {
-                //図鑑移行ボタン
-                if (showZukan) {
-                    Box(Modifier.fillMaxSize()) {
-                        Zukan()
-                        FilledTonalButton(
-                            onClick = { showZukan = false },
-                            modifier = Modifier.padding(100.dp,20.dp).align(Alignment.TopStart)
-                        ) { Text("戻る") }
-                    }
-                    return@MaterialTheme
-                }
-                //ここまで図鑑移行ボタン
-                val context = LocalContext.current
-                val scope = rememberCoroutineScope()
-                val repo = remember { FirestoreAlarmRepository() }
+                val nav = rememberNavController()
 
-                // Firestore: 複数アラーム購読
-                val alarms: List<AlarmItem> by remember(repo) { repo.observeAlarms() }
-                    .collectAsState(initial = emptyList())
+                NavHost(navController = nav, startDestination = initialRoute) {
 
-                // 追加・編集用
-                var pickerTargetId by remember { mutableStateOf<String?>(null) } // null=追加
-                var showPicker by remember { mutableStateOf(false) }
-                var tempHour by remember { mutableStateOf(7) }
-                var tempMinute by remember { mutableStateOf(0) }
-
-                // Firestore状態で冪等同期
-                LaunchedEffect(alarms) {
-                    alarms.forEach { a ->
-                        if (a.enabled) scheduleAlarm(context, a.id, a.hour, a.minute)
-                        else cancelAlarm(context, a.id)
+                    // Home
+                    composable("home") {
+                        HomeScreen(
+                            isDark = isDark,
+                            onToggleTheme = { isDark = !isDark },
+                            onAlarmClick = { nav.navigate("alarm") },
+                            onDexClick = { /* TODO: 図鑑 */ },
+                            onSleepClick = {
+                                // ★ 睡眠フラグON + 開始時刻保存 → sleep へ
+                                setSleepActive(applicationContext, true)
+                                setSleepStartAt(applicationContext, System.currentTimeMillis())
+                                nav.navigate("sleep") { launchSingleTop = true }
+                            }
+                        )
                     }
 
-                }
-
-                Scaffold(
-                    topBar = {
-                        TopAppBar(
-                            title = { Text("アラーム") },
-                            actions = {
-                                //図鑑へ
-                                TextButton(onClick = { showZukan = true }) { Text("図鑑") }
-                                // ダーク/ライト切替（独自アイコン）
-                                IconButton(onClick = { isDark = !isDark }) {
-                                    Icon(
-                                        painter = painterResource(
-                                            id = if (isDark) R.drawable.ic_light_mode_24
-                                            else R.drawable.ic_dark_mode_24
-                                        ),
-                                        contentDescription = if (isDark) "ライトモードに切替" else "ダークモードに切替"
-                                    )
-                                }
-                                // アラーム音量（システム UI）
-                                IconButton(onClick = { showAlarmVolumePanel(context) }) {
-                                    Icon(Icons.Filled.Notifications, contentDescription = "アラーム音量")
-                                }
-                                // 追加
-                                IconButton(onClick = {
-                                    val now = Calendar.getInstance()
-                                    pickerTargetId = null
-                                    tempHour = now.get(Calendar.HOUR_OF_DAY)
-                                    tempMinute = now.get(Calendar.MINUTE)
-                                    showPicker = true
-                                }) {
-                                    Icon(Icons.Filled.Add, contentDescription = "Add")
+                    // スリープ画面（アプリ内フルスクリーン表示）
+                    composable("sleep") {
+                        // ★ onWake は「ポップアップ閉鎖後にHomeへ戻る」ための遷移だけを担当
+                        SleepScreen(
+                            onWake = {
+                                nav.navigate("home") {
+                                    launchSingleTop = true
+                                    popUpTo("home") { inclusive = true } // Homeを一枚だけに
                                 }
                             }
                         )
                     }
-                ) { inner ->
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(inner)
-                    ) {
-                        if (alarms.isEmpty()) {
-                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text("アラームがありません。右上の＋で追加")
-                            }
-                        } else {
-                            LazyColumn(
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(12.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(alarms, key = { it.id }) { alarm ->
-                                    AlarmRow(
-                                        alarm = alarm,
-                                        onToggle = { checked ->
-                                            scope.launch {
-                                                repo.setEnabled(alarm.id, checked)
-                                                if (checked) scheduleAlarm(context, alarm.id, alarm.hour, alarm.minute)
-                                                else cancelAlarm(context, alarm.id)
-                                            }
-                                        },
-                                        onEditTime = {
-                                            pickerTargetId = alarm.id
-                                            tempHour = alarm.hour
-                                            tempMinute = alarm.minute
-                                            showPicker = true
-                                        },
-                                        onDelete = {
-                                            scope.launch {
-                                                cancelAlarm(context, alarm.id)
-                                                repo.delete(alarm.id)
-                                            }
-                                        }
-                                    )
-                                }
-                            }
-                        }
-                    }
 
-                    if (showPicker) {
-                        WheelTimePickerDialog(
-                            initialHour = tempHour,
-                            initialMinute = tempMinute,
-                            isDark = isDark,                 // ← ダーク状態を渡す
-                            onDismiss = { showPicker = false },
-                            onConfirm = { h, m ->
-                                showPicker = false
-                                scope.launch {
-                                    if (pickerTargetId == null) {
-                                        val id = repo.addAlarm(h, m, enabled = true)
-                                        scheduleAlarm(context, id, h, m)
-                                        Toast.makeText(context, "アラームを追加しました", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        val id = pickerTargetId!!
-                                        repo.updateTime(id, h, m)
-                                        alarms.find { it.id == id }?.let { item ->
-                                            if (item.enabled) scheduleAlarm(context, id, h, m)
-                                        }
-                                        Toast.makeText(context, "時刻を更新しました", Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            }
+                    // 既存アラーム画面
+                    composable("alarm") {
+                        com.example.sleep_garden.alarm.AlarmScreen(
+                            onBack = { nav.popBackStack() },
+                            isDark = isDark,
+                            onToggleTheme = { isDark = !isDark }
                         )
                     }
                 }
@@ -257,268 +100,419 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-/* ---------- 端末スケジュール ---------- */
+/* ---------------- Home：下端そろえ（以前のUIそのまま） ---------------- */
 
-private fun alarmRequestCode(alarmId: String): Int = abs(alarmId.hashCode())
-
-private fun scheduleAlarm(context: Context, alarmId: String, hour: Int, minute: Int) {
-    val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-
-    val fireIntent = Intent(context, com.example.sleep_garden.alarm.AlarmReceiver::class.java).apply {
-        putExtra("alarmId", alarmId)
-        action = "com.example.sleep_garden.ALARM_$alarmId"
-    }
-    val firePi = PendingIntent.getBroadcast(
-        context,
-        alarmRequestCode(alarmId),
-        fireIntent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-
-    val showIntent = Intent(context, com.example.sleep_garden.alarm.AlarmActivity::class.java).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        putExtra("alarmId", alarmId)
-    }
-    val showPi = PendingIntent.getActivity(
-        context,
-        ("show_$alarmId").hashCode(),
-        showIntent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-
-    val cal = Calendar.getInstance().apply {
-        set(Calendar.HOUR_OF_DAY, hour)
-        set(Calendar.MINUTE, minute)
-        set(Calendar.SECOND, 0)
-        set(Calendar.MILLISECOND, 0)
-        if (timeInMillis <= System.currentTimeMillis()) add(Calendar.DAY_OF_YEAR, 1)
-    }
-
-    val info = AlarmManager.AlarmClockInfo(cal.timeInMillis, showPi)
-    am.setAlarmClock(info, firePi)
-}
-
-private fun cancelAlarm(context: Context, alarmId: String) {
-    val intent = Intent(context, com.example.sleep_garden.alarm.AlarmReceiver::class.java).apply {
-        putExtra("alarmId", alarmId)
-        action = "com.example.sleep_garden.ALARM_$alarmId"
-    }
-    val pending = PendingIntent.getBroadcast(
-        context,
-        alarmRequestCode(alarmId),
-        intent,
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-    val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-    alarmManager.cancel(pending)
-}
-
-/* ---------- ホイール（Compose実装）版の時間ダイアログ ---------- */
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WheelTimePickerDialog(
-    initialHour: Int,
-    initialMinute: Int,
+private fun HomeScreen(
     isDark: Boolean,
-    onDismiss: () -> Unit,
-    onConfirm: (Int, Int) -> Unit,
+    onToggleTheme: () -> Unit,
+    onAlarmClick: () -> Unit,
+    onDexClick: () -> Unit,
+    onSleepClick: () -> Unit
 ) {
-    var hour by remember { mutableStateOf(initialHour.coerceIn(0, 23)) }
-    var minute by remember { mutableStateOf(initialMinute.coerceIn(0, 59)) }
+    // ▼ 追加：XP表示のための状態（起動/復帰時に最新反映）
+    val ctx = LocalContext.current
+    val xpRepo = remember { com.example.sleep_garden.data.XpRepository.getInstance(ctx) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("時間を選択") },
-        text = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(24.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // 時（0..23）
-                Wheel(
-                    range = 0..23,
-                    value = hour,
-                    onValueChange = { hour = it },
-                    formatter = { "%02d".format(it) },
-                    isDark = isDark,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(200.dp)
-                )
-                // 分（0..59）
-                Wheel(
-                    range = 0..59,
-                    value = minute,
-                    onValueChange = { minute = it },
-                    formatter = { "%02d".format(it) },
-                    isDark = isDark,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(200.dp)
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(hour, minute) }) { Text("決定") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("キャンセル") }
-        }
-    )
-}
+    var level by remember { mutableStateOf(xpRepo.getLevel()) }
+    var currentXp by remember { mutableStateOf(xpRepo.getXp()) }
+    var nextReq by remember { mutableStateOf(xpRepo.getRequiredXpFor(level)) }
 
-@Composable
-private fun Wheel(
-    range: IntRange,
-    value: Int,
-    onValueChange: (Int) -> Unit,
-    formatter: (Int) -> String,
-    isDark: Boolean,
-    modifier: Modifier = Modifier,
-    visibleCount: Int = 5,        // 中央1行 + 上下同数（奇数）
-    itemHeight: Dp = 40.dp
-) {
-    val items = remember(range) { range.toList() }
-    val centerOffset = visibleCount / 2
-    val wantedIndex = (value - range.first).coerceIn(0, items.lastIndex)
-
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = (wantedIndex - centerOffset).coerceAtLeast(0)
-    )
-
-    val density = LocalDensity.current
-    val itemHpx = with(density) { itemHeight.toPx() }
-
-    // ❶ スナップ挙動（Compose Foundation）
-    val flingBehavior = androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior(
-        lazyListState = listState
-    )
-
-    // ❷ 初期位置合わせは一度だけ（ドリフト防止）
+    // Home に戻ってきた時点で最新値を反映
     LaunchedEffect(Unit) {
-        listState.scrollToItem((wantedIndex - centerOffset).coerceAtLeast(0))
+        level = xpRepo.getLevel()
+        currentXp = xpRepo.getXp()
+        nextReq = xpRepo.getRequiredXpFor(level)
     }
 
-    // ❸ 中央行のインデックスを算出（常に Int 計算）
-    val selectedIndex by remember {
-        derivedStateOf {
-            val info = listState.layoutInfo
-            if (info.visibleItemsInfo.isEmpty()) {
-                wantedIndex
-            } else {
-                val start: Int = info.viewportStartOffset
-                val end: Int = info.viewportEndOffset
-                val center: Int = start + (end - start) / 2
+    val progress = remember(level, currentXp, nextReq) {
+        if (level >= com.example.sleep_garden.data.XpRepository.MAX_LEVEL) 1f
+        else if (nextReq <= 0) 0f
+        else (currentXp.toFloat() / nextReq.toFloat()).coerceIn(0f, 1f)
+    }
+    // ▲ ここまで追加
 
-                val nearest = info.visibleItemsInfo.minByOrNull { item: LazyListItemInfo ->
-                    val itemCenter: Int = item.offset + item.size / 2
-                    kotlin.math.abs(itemCenter - center)
+    Scaffold(
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text("睡眠花育成", style = MaterialTheme.typography.titleLarge) },
+                actions = {
+                    IconButton(onClick = { /* アラーム音量UIはアラーム画面で */ }) {
+                        Icon(Icons.Filled.Notifications, contentDescription = "アラーム音量")
+                    }
+                    IconButton(onClick = onToggleTheme) {
+                        val icon = if (isDark) R.drawable.ic_light_mode_24 else R.drawable.ic_dark_mode_24
+                        Icon(painterResource(icon), contentDescription = "テーマ切替")
+                    }
                 }
-                (nearest?.index ?: wantedIndex).coerceIn(0, items.lastIndex)
-            }
+            )
         }
-    }
-
-    // ❹ 中央行が変わったときだけ外へ通知（無限ループを避ける）
-    LaunchedEffect(selectedIndex) {
-        val newValue = items[selectedIndex]
-        if (newValue != value) onValueChange(newValue)
-    }
-
-    val lineColor = if (isDark) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.outline
-    val textColor = MaterialTheme.colorScheme.onSurface
-    val verticalPad: Dp = itemHeight * centerOffset
-
-    Box(modifier = modifier) {
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = verticalPad, bottom = verticalPad),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
-            flingBehavior = flingBehavior // ← スナップを適用
-        ) {
-            items(
-                count = items.size,
-                key = { idx -> items[idx] }
-            ) { i ->
-                // 「今の中央項目か」で強調を切り替え
-                val selected = (i == selectedIndex)
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(itemHeight),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = formatter(items[i]),
-                        color = if (selected) textColor else textColor.copy(alpha = 0.6f),
-                        style = if (selected)
-                            MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                        else
-                            MaterialTheme.typography.titleMedium
-                    )
-                }
-            }
-        }
-
-        // 中央の2本ライン（外側のみ）
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val yTop = size.height / 2f - itemHpx / 2f
-            val yBottom = size.height / 2f + itemHpx / 2f
-            val stroke = with(density) { 2.dp.toPx() }
-            drawLine(lineColor, Offset(0f, yTop), Offset(size.width, yTop), stroke)
-            drawLine(lineColor, Offset(0f, yBottom), Offset(size.width, yBottom), stroke)
-        }
-    }
-}
-
-/** システムの音量UIを開いて、アラーム音量を調節させる */
-private fun showAlarmVolumePanel(context: Context) {
-    val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    am.adjustStreamVolume(
-        AudioManager.STREAM_ALARM,
-        AudioManager.ADJUST_SAME,
-        AudioManager.FLAG_SHOW_UI
-    )
-}
-
-/* ---- 一覧行 ---- */
-@Composable
-private fun AlarmRow(
-    alarm: AlarmItem,
-    onToggle: (Boolean) -> Unit,
-    onEditTime: () -> Unit,
-    onDelete: () -> Unit
-) {
-    Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 2.dp) {
-        Row(
+    ) { inner ->
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(inner)
         ) {
+            // 背景
+            Image(
+                painter = painterResource(R.drawable.home),
+                contentDescription = "background",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+
+            // ===== 上部：XPバー（追加） + 下部：既存ボタン群 =====
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .clickable(onClick = onEditTime)
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                Text(
-                    text = "%02d:%02d".format(alarm.hour, alarm.minute),
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = if (alarm.enabled) "ON" else "OFF",
-                    style = MaterialTheme.typography.labelMedium
+                // ▼ 追加：XPパネル
+                Surface(
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
+                    shape = RoundedCornerShape(14.dp),
+                    tonalElevation = 2.dp,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Lv $level",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (level < com.example.sleep_garden.data.XpRepository.MAX_LEVEL) {
+                                Text(
+                                    text = "$currentXp / $nextReq XP",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            } else {
+                                Text(
+                                    text = "MAX",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        LinearProgressIndicator(
+                            progress = progress,
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(14.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                        )
+                    }
+                }
+                // ▲ ここまでXPパネル
+
+                Spacer(Modifier.weight(1f)) // 下のボタン群を最下段へ寄せる
+
+                // ===== 画面最下端（安全エリア下端）にボタン群を吸着（既存そのまま） =====
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val buttonScale = 1.18f
+                    val rowBtnHeight  = (maxWidth * 0.24f * buttonScale).coerceIn(120.dp, 208.dp)
+                    val wideBtnHeight = (maxWidth * 0.22f * buttonScale).coerceIn(110.dp, 196.dp)
+                    val innerPadRow   = rowBtnHeight * 0.09f
+                    val innerPadWide  = wideBtnHeight * 0.09f
+
+                    // ▼ 下げ幅をここで調整（例: 10.dp → 24.dp）
+                    val buttonsYOffset = 22.dp
+
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .offset(y = buttonsYOffset),
+                        verticalArrangement = Arrangement.Bottom,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        // 上段2ボタン
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .offset(y = 17.dp) // 上段だけ少し下げる
+                                .padding(horizontal = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ImageButton(
+                                resId = R.drawable.btn_alarm,
+                                contentDesc = "アラーム・種植え",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(rowBtnHeight),
+                                corner = 20.dp,
+                                contentPadding = innerPadRow,
+                                onClick = onAlarmClick
+                            )
+                            ImageButton(
+                                resId = R.drawable.btn_dex,
+                                contentDesc = "花図鑑",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(rowBtnHeight),
+                                corner = 20.dp,
+                                contentPadding = innerPadRow,
+                                onClick = onDexClick
+                            )
+                        }
+
+                        // 下段ワイド（寝る・成長）
+                        ImageButton(
+                            resId = R.drawable.btn_sleep,
+                            contentDesc = "寝る・成長",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp)
+                                .height(wideBtnHeight),
+                            corner = 22.dp,
+                            contentPadding = innerPadWide,
+                            onClick = onSleepClick
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+/* ---------------- スリープ画面（アプリ内フルスクリーン + 起きるボタン + 獲得XPポップアップ） ---------------- */
+
+@Composable
+private fun SleepScreen(
+    onWake: () -> Unit // ← ポップアップを閉じた後に呼ぶ（= Homeに戻る）
+) {
+    val ctx = LocalContext.current
+
+    // ポップアップ表示用の状態
+    var showGained by remember { mutableStateOf(false) }
+    var gainedAmount by remember { mutableStateOf(0) }
+    var popupLevel by remember { mutableStateOf(1) }
+    var popupCurrentXp by remember { mutableStateOf(0) }
+    var popupNextReq by remember { mutableStateOf(0) }
+    var popupLeveledTo by remember { mutableStateOf<Int?>(null) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+    ) {
+        Image(
+            painter = painterResource(R.drawable.sleep_overlay),
+            contentDescription = "sleep overlay",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Crop
+        )
+
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            val w = (maxWidth * 0.90f).coerceIn(220.dp, 500.dp)
+            val h = w * (118f / 362f)
+            val innerPad = h * 0.02f
+
+            Box(
+                modifier = Modifier
+                    .size(width = w, height = h)
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(
+                        onClick = {
+                            // ★ 起きる押下：ここでXP計算 → ポップアップ表示
+                            val start = getSleepStartAt(ctx) ?: System.currentTimeMillis()
+                            val minutes = max(0, ((System.currentTimeMillis() - start) / 60_000L).toInt())
+
+                            val xpRepo = XpRepository.getInstance(ctx)
+                            val result = xpRepo.addXpAndLevelUp(minutes)
+
+                            gainedAmount = result.added
+                            popupLevel = result.newLevel
+                            popupCurrentXp = result.newXp
+                            popupNextReq = result.newRequired
+                            popupLeveledTo = result.leveledUpTo
+                            showGained = true
+                        }
+                    )
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.btn_wake),
+                    contentDescription = "起きる",
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPad),
+                    contentScale = ContentScale.Fit
                 )
             }
-            Switch(checked = alarm.enabled, onCheckedChange = onToggle)
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = onDelete) {
-                Icon(Icons.Outlined.Delete, contentDescription = "Delete")
+        }
+
+        // ★ 獲得XPポップアップ（閉じたらフラグOFF→開始時刻クリア→Homeへ）
+        if (showGained) {
+            GainedXpPopup(
+                gained = gainedAmount,
+                newLevel = popupLevel,
+                currentXp = popupCurrentXp,
+                nextReq = popupNextReq,
+                leveledUpTo = popupLeveledTo,
+                onDismiss = {
+                    setSleepActive(ctx, false)
+                    setSleepStartAt(ctx, null)
+                    showGained = false
+                    onWake() // ← Homeへ戻る
+                }
+            )
+        }
+    }
+}
+
+/* ---------------- 画像そのものを押せるボタン（中身は余白で縮小） ---------------- */
+
+@Composable
+private fun ImageButton(
+    @DrawableRes resId: Int,
+    contentDesc: String?,
+    modifier: Modifier = Modifier,
+    corner: Dp = 18.dp,
+    contentPadding: Dp = 10.dp,
+    onClick: () -> Unit
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.98f else 1f, label = "pressScale")
+
+    Box(
+        modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(RoundedCornerShape(corner))
+            .indication(interaction, ripple())
+            .clickable(interactionSource = interaction, indication = null, onClick = onClick)
+            .padding(contentPadding) // 画像だけ一回り内側へ（見切れ防止）
+    ) {
+        Image(
+            painter = painterResource(resId),
+            contentDescription = contentDesc,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit,
+            alignment = Alignment.Center
+        )
+    }
+}
+
+/* ---------------- シンプルな永続フラグ（睡眠中かどうか） ---------------- */
+
+private fun isSleepActive(ctx: Context): Boolean =
+    ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
+        .getBoolean("sleep_active", false)
+
+private fun setSleepActive(ctx: Context, value: Boolean) {
+    ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean("sleep_active", value)
+        .apply()
+}
+
+/* ---------------- 追加：睡眠開始時刻の保存/取得（XP計算のため） ---------------- */
+
+private fun getSleepStartAt(ctx: Context): Long? {
+    val t = ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
+        .getLong("sleep_started_at", 0L)
+    return if (t == 0L) null else t
+}
+
+private fun setSleepStartAt(ctx: Context, timeMillis: Long?) {
+    ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
+        .edit()
+        .putLong("sleep_started_at", timeMillis ?: 0L)
+        .apply()
+}
+
+/* ---------------- 追加：獲得XPポップアップ（詳細付き） ---------------- */
+
+@Composable
+private fun GainedXpPopup(
+    gained: Int,
+    newLevel: Int,
+    currentXp: Int,
+    nextReq: Int,
+    leveledUpTo: Int?, // nullで「レベルアップなし」
+    onDismiss: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f))
+            .clickable(onClick = onDismiss),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .padding(24.dp)
+                .clickable(enabled = false) {}
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "獲得XP",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = "+$gained XP",
+                    style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(12.dp))
+
+                if (leveledUpTo != null) {
+                    Text(
+                        text = "レベルアップ！ → Lv $leveledUpTo",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(6.dp))
+                }
+
+                Text(
+                    text = "現在レベル：Lv $newLevel",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(Modifier.height(6.dp))
+
+                if (newLevel < XpRepository.MAX_LEVEL) {
+                    Text(
+                        text = "次のレベルまで：${(nextReq - currentXp).coerceAtLeast(0)} XP",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                } else {
+                    Text(
+                        text = "レベルは最大です",
+                        style = MaterialTheme.typography.bodyMedium, // ← 既存に合わせてください。typography なら修正: MaterialTheme.typography.bodyMedium
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = "タップで閉じる",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
     }

@@ -9,7 +9,6 @@ class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val alarmId = intent.getStringExtra("alarmId") ?: "default"
 
-        // 音を鳴らすサービスを起動（通知はサービス側で作成）
         val svc = Intent(context, AlarmRingtoneService::class.java).apply {
             action = AlarmRingtoneService.ACTION_START
             putExtra("alarmId", alarmId)

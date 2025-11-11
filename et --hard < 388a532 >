@@ -1,0 +1,20 @@
+[33m40f50ca[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32ms23004[m[33m, [m[1;31mupstream/s23004[m[33m)[m Merge remote-tracking branch 'upstream/s23004' into s23004
+[33m388a532[m LV&XP owari
+[33mf75b095[m Merge pull request #7 from itc-s23016/s23016
+[33ma2a6ff6[m 寝るボタンを押した時のUI動作作成
+[33m9390eb7[m[33m ([m[1;32mmaster[m[33m)[m Merge pull request #6 from itc-s23016/s23016
+[33mc14fcc9[m ホーム画面UIとボタン作成
+[33maf3b98e[m ホーム画面UIとボタン作成
+[33ma6058a3[m Merge pull request #5 from itc-s23016/s23016
+[33ma5b09be[m 時間ホイールの修正とアプリアイコンの作成
+[33mdfa55e3[m[33m ([m[1;31morigin/s23004[m[33m, [m[1;32mbackup/s23004-20251105-1150[m[33m)[m XP
+[33m035a81d[m Merge pull request #4 from itc-s23016/s23016
+[33m95e6428[m ダークモード追加と時間ホイールの修正
+[33mec2686d[m Merge pull request #3 from itc-s23016/s23016
+[33m95f65c9[m アラーム画面UI変更
+[33m59916e6[m Merge pull request #2 from itc-s23016/s23016
+[33mb1d4d4b[m アラームの設定UI変更
+[33ma00863b[m コンフリクトの解決
+[33m83cb104[m Merge branch 'master' into s23004
+[33mcfd817c[m アラームの止め方変更
+[33m3586e0f[m a
