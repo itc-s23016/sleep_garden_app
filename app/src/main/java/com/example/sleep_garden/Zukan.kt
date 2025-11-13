@@ -1,9 +1,6 @@
-package com.example.sleep_garden
+package com.example.sleep_garden.data.flower
 
 import android.app.Activity
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.util.LruCache
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedDispatcherOwner
 import androidx.compose.foundation.Image
@@ -21,20 +18,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.sleep_garden.data.Flower
-import com.example.sleep_garden.data.FlowerViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,26 +33,26 @@ fun Zukan(
     onBack: (() -> Unit)? = null
 ) {
     val ctx = LocalContext.current
-    // ✅ ActivityスコープでViewModelを共有
-    val vm: FlowerViewModel = viewModel(viewModelStoreOwner = ctx as ComponentActivity)
 
-    // 🔙 戻る処理
-    val handleBack: () -> Unit = onBack ?: run {
-        {
-            val owner = ctx as? OnBackPressedDispatcherOwner
-            if (owner != null) owner.onBackPressedDispatcher.onBackPressed()
-            else if (ctx is Activity) ctx.finish()
-        }
-    }
+    // ★ 安全に Activity を取得
+    val activity = ctx as? ComponentActivity
+        ?: throw IllegalStateException("Zukan must be used inside Activity")
 
-    val flowers by vm.flowers.collectAsState()
+    val vm: FlowerViewModel = viewModel(viewModelStoreOwner = activity)
+
+    val flowers by vm.flowers.collectAsState(initial = emptyList())
     var selected by remember { mutableStateOf<Flower?>(null) }
 
-    // 🌱 起動時にDBから読込
+    // ★ 初回だけ初期データ投入
     LaunchedEffect(Unit) {
-        vm.refresh()
-        println("🌸 DB中の花数 = ${vm.flowers.value.size}")
-        vm.flowers.value.forEach { println("→ ${it.name}, found=${it.found}") }
+        vm.insertInitialFlowers()
+    }
+
+    // ★ 戻る処理
+    val handleBack = onBack ?: {
+        val owner = ctx as? OnBackPressedDispatcherOwner
+        if (owner != null) owner.onBackPressedDispatcher.onBackPressed()
+        else if (ctx is Activity) ctx.finish()
     }
 
     Scaffold(
@@ -71,28 +62,33 @@ fun Zukan(
             Modifier
                 .padding(pad)
                 .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f))
         ) {
 
-            // 🌼 一覧 or 空表示
+            // ====================
+            //   花一覧
+            // ====================
             if (flowers.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("データがありません（${flowers.size}件）")
+                    Text("データがありません")
                 }
             } else {
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(4),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(flowers, key = { it.id ?: it.name.hashCode().toLong() }) { f ->
+                    items(flowers, key = { it.id }) { f ->
                         ZukanCell(f) { selected = f }
                     }
                 }
             }
 
-            // 🌸 詳細オーバーレイ
+            // ====================
+            //   オーバーレイ
+            // ====================
             if (selected != null) {
                 Box(
                     Modifier
@@ -102,25 +98,28 @@ fun Zukan(
                 )
             }
 
-            // 🌼 詳細カード
+            // ====================
+            //   詳細カード
+            // ====================
             selected?.let { f ->
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     tonalElevation = 6.dp,
-                    shadowElevation = 12.dp,
                     modifier = Modifier
                         .align(Alignment.Center)
                         .fillMaxWidth(0.9f)
-                        .heightIn(min = 280.dp, max = 620.dp)
+                        .heightIn(min = 300.dp, max = 650.dp)
                 ) {
                     val scroll = rememberScrollState()
+
                     Column(
                         modifier = Modifier
                             .verticalScroll(scroll)
                             .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // 画像
+
+                        // ---- 画像表示：imageResId ----
                         Surface(
                             tonalElevation = 2.dp,
                             shape = RoundedCornerShape(16.dp),
@@ -128,29 +127,15 @@ fun Zukan(
                                 .fillMaxWidth()
                                 .height(220.dp)
                         ) {
-                            val img = rememberUrlImageBitmap(f.imageUrl)
-                            when {
-                                f.imageUrl.isNullOrBlank() -> {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text("Null", style = MaterialTheme.typography.titleMedium)
-                                    }
-                                }
-                                img.value != null -> {
-                                    Image(
-                                        bitmap = img.value!!,
-                                        contentDescription = f.name,
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentScale = ContentScale.Crop
-                                    )
-                                }
-                                else -> {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text(f.name)
-                                    }
-                                }
-                            }
+                            Image(
+                                painter = painterResource(id = f.imageResId),
+                                contentDescription = f.name,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
                         }
 
+                        // ---- タイトル + レアリティ ----
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -158,12 +143,13 @@ fun Zukan(
                             Text(
                                 f.name,
                                 style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold,
+                                fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f)
                             )
                             Text("☆${f.rarity}", style = MaterialTheme.typography.titleMedium)
                         }
 
+                        // ---- 説明文 ----
                         Text(
                             f.description,
                             style = MaterialTheme.typography.bodyMedium,
@@ -178,7 +164,9 @@ fun Zukan(
                 }
             }
 
-            // 🔙 戻るボタン
+            // ====================
+            //   戻るボタン
+            // ====================
             if (selected == null) {
                 Button(
                     onClick = handleBack,
@@ -193,9 +181,13 @@ fun Zukan(
     }
 }
 
+
+/* ======================================================
+   花１枠（4列グリッド用）
+====================================================== */
+
 @Composable
 private fun ZukanCell(flower: Flower, onClick: () -> Unit) {
-    val img = rememberUrlImageBitmap(flower.imageUrl)
     Surface(
         tonalElevation = 1.dp,
         shape = MaterialTheme.shapes.small,
@@ -206,68 +198,18 @@ private fun ZukanCell(flower: Flower, onClick: () -> Unit) {
         when {
             !flower.found -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("？", style = MaterialTheme.typography.headlineLarge)
+                    Text("未発見 🌱", style = MaterialTheme.typography.labelLarge)
                 }
             }
-            img.value != null -> {
+
+            else -> {
                 Image(
-                    bitmap = img.value!!,
+                    painter = painterResource(id = flower.imageResId),
                     contentDescription = flower.name,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
             }
-            flower.imageUrl.isNullOrBlank() -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("Null")
-                }
-            }
-            else -> {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(modifier = Modifier.size(20.dp))
-                }
-            }
         }
     }
-}
-
-// ---- URL画像ローダ（Coilなし簡易版） ----
-private val bitmapCache = object : LruCache<String, Bitmap>(4 * 1024 * 1024) {
-    override fun sizeOf(key: String, value: Bitmap): Int = value.allocationByteCount
-}
-
-@Composable
-private fun rememberUrlImageBitmap(url: String?): State<ImageBitmap?> {
-    val state = remember(url) { mutableStateOf<ImageBitmap?>(null) }
-
-    LaunchedEffect(url) {
-        if (url.isNullOrBlank()) {
-            state.value = null
-            return@LaunchedEffect
-        }
-
-        bitmapCache.get(url)?.let {
-            state.value = it.asImageBitmap()
-            return@LaunchedEffect
-        }
-
-        val bmp = withContext(Dispatchers.IO) {
-            try {
-                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 5000
-                    readTimeout = 5000
-                    instanceFollowRedirects = true
-                }
-                conn.inputStream.use { BitmapFactory.decodeStream(it) }
-            } catch (_: Exception) {
-                null
-            }
-        }
-
-        bmp?.let {
-            bitmapCache.put(url, it)
-            state.value = it.asImageBitmap()
-        }
-    }
-    return state
 }
