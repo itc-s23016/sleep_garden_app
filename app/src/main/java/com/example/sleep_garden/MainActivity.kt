@@ -37,6 +37,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.sleep_garden.data.XpRepository
 import kotlin.math.max
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.FilledTonalButton
+import com.example.sleep_garden.data.flower.Zukan
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
@@ -51,6 +57,7 @@ class MainActivity : ComponentActivity() {
             val systemDark = isSystemInDarkTheme()
             var isDark by rememberSaveable { mutableStateOf(systemDark) }
             val scheme = if (isDark) darkColorScheme() else lightColorScheme()
+            var showZukan by rememberSaveable { mutableStateOf(false) }
 
             MaterialTheme(colorScheme = scheme) {
                 val nav = rememberNavController()
@@ -63,7 +70,7 @@ class MainActivity : ComponentActivity() {
                             isDark = isDark,
                             onToggleTheme = { isDark = !isDark },
                             onAlarmClick = { nav.navigate("alarm") },
-                            onDexClick = { /* TODO: 図鑑 */ },
+                            onDexClick = { nav.navigate("zukan") },
                             onSleepClick = {
                                 // ★ 睡眠フラグON + 開始時刻保存 → sleep へ
                                 setSleepActive(applicationContext, true)
@@ -71,6 +78,9 @@ class MainActivity : ComponentActivity() {
                                 nav.navigate("sleep") { launchSingleTop = true }
                             }
                         )
+                    }
+                    composable("zukan") {
+                        Zukan(onBack = { nav.popBackStack() })
                     }
 
                     // スリープ画面（アプリ内フルスクリーン表示）
@@ -94,6 +104,8 @@ class MainActivity : ComponentActivity() {
                             onToggleTheme = { isDark = !isDark }
                         )
                     }
+
+
                 }
             }
         }
@@ -289,6 +301,7 @@ private fun HomeScreen(
 
 @Composable
 private fun SleepScreen(
+
     onWake: () -> Unit // ← ポップアップを閉じた後に呼ぶ（= Homeに戻る）
 ) {
     val ctx = LocalContext.current

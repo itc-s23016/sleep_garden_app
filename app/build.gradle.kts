@@ -8,6 +8,7 @@ plugins {
 
     // Room Gradle Plugin（スキーマ出力設定はこちらで）
     id("androidx.room") version "2.6.1"
+
 }
 
 android {
@@ -61,6 +62,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-text-google-fonts")
     implementation(libs.androidx.compose.foundation.layout)
     implementation(libs.androidx.media3.effect)
+    implementation(libs.androidx.compose.foundation.layout)
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
 
     // --- Room（KSPに統一） ---
     val roomVersion = "2.6.1"
@@ -72,7 +75,7 @@ dependencies {
 
 room {
     // スキーマJSONの出力先（app/schemas フォルダを作っておく）
-    schemaDirectory("$projectDir/schemas")
+    schemaDirectory("$projectDir/room_schemas")
 }
 
 // ★ ここに ksp { arg("room.schemaLocation", ...) } は書かない
