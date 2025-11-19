@@ -11,9 +11,6 @@ data class Flower(
     val name: String,
     val rarity: Int,
     val description: String,
-
-
     val imageResId: Int,
-
     val found: Boolean
 )

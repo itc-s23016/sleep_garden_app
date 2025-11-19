@@ -13,6 +13,8 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -34,7 +37,6 @@ fun Zukan(
 ) {
     val ctx = LocalContext.current
 
-    // ★ 安全に Activity を取得
     val activity = ctx as? ComponentActivity
         ?: throw IllegalStateException("Zukan must be used inside Activity")
 
@@ -43,12 +45,12 @@ fun Zukan(
     val flowers by vm.flowers.collectAsState(initial = emptyList())
     var selected by remember { mutableStateOf<Flower?>(null) }
 
-    // ★ 初回だけ初期データ投入
+    // 初期データ投入
     LaunchedEffect(Unit) {
         vm.insertInitialFlowers()
     }
 
-    // ★ 戻る処理
+    // 戻る処理
     val handleBack = onBack ?: {
         val owner = ctx as? OnBackPressedDispatcherOwner
         if (owner != null) owner.onBackPressedDispatcher.onBackPressed()
@@ -56,13 +58,36 @@ fun Zukan(
     }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("花図鑑") }) }
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "花図鑑",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Start,
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                },
+                navigationIcon = {},  // 左側に何も置かない
+                actions = {
+                    IconButton(onClick = { handleBack() }) {
+                        Icon(
+                            imageVector = Icons.Filled.ArrowBack,
+                            contentDescription = "戻る",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            )
+        }
     ) { pad ->
         Box(
             Modifier
                 .padding(pad)
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f))
+                .background(
+                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.05f)
+                )
         ) {
 
             // ====================
@@ -87,7 +112,7 @@ fun Zukan(
             }
 
             // ====================
-            //   オーバーレイ
+            //   黒背景オーバーレイ
             // ====================
             if (selected != null) {
                 Box(
@@ -99,7 +124,7 @@ fun Zukan(
             }
 
             // ====================
-            //   詳細カード
+            //   花の詳細カード
             // ====================
             selected?.let { f ->
                 Surface(
@@ -119,13 +144,13 @@ fun Zukan(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
 
-                        // ---- 画像表示：imageResId ----
+                        // ---- 画像 ----
                         Surface(
                             tonalElevation = 2.dp,
                             shape = RoundedCornerShape(16.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(220.dp)
+                                .height(390.dp)
                         ) {
                             Image(
                                 painter = painterResource(id = f.imageResId),
@@ -135,7 +160,7 @@ fun Zukan(
                             )
                         }
 
-                        // ---- タイトル + レアリティ ----
+                        // ---- タイトル + レア度 ----
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -149,7 +174,7 @@ fun Zukan(
                             Text("☆${f.rarity}", style = MaterialTheme.typography.titleMedium)
                         }
 
-                        // ---- 説明文 ----
+                        // ---- 説明 ----
                         Text(
                             f.description,
                             style = MaterialTheme.typography.bodyMedium,
@@ -157,24 +182,15 @@ fun Zukan(
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                            TextButton(onClick = { selected = null }) { Text("閉じる") }
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            TextButton(onClick = { selected = null }) {
+                                Text("閉じる")
+                            }
                         }
                     }
-                }
-            }
-
-            // ====================
-            //   戻るボタン
-            // ====================
-            if (selected == null) {
-                Button(
-                    onClick = handleBack,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(16.dp)
-                ) {
-                    Text("戻る")
                 }
             }
         }
@@ -183,9 +199,8 @@ fun Zukan(
 
 
 /* ======================================================
-   花１枠（4列グリッド用）
+   グリッド用セル
 ====================================================== */
-
 @Composable
 private fun ZukanCell(flower: Flower, onClick: () -> Unit) {
     Surface(

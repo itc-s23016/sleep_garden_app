@@ -23,8 +23,12 @@ abstract class FlowerDatabase : RoomDatabase() {
                 INSTANCE ?: Room.databaseBuilder(
                     context.applicationContext,
                     FlowerDatabase::class.java,
-                    "flower_db"          // ← 花専用DBのファイル名
-                ).build().also { INSTANCE = it }
+                    "flower_db"
+                )
+                    // ← ★ これを入れないと次の変更でクラッシュする！
+                    .fallbackToDestructiveMigration()
+                    .build()
+                    .also { INSTANCE = it }
             }
     }
 }
