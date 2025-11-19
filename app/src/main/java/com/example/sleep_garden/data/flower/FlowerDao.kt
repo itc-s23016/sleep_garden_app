@@ -33,5 +33,15 @@ interface FlowerDao {
     @Query("SELECT * FROM flowers WHERE name = :name LIMIT 1")
     suspend fun findByName(name: String): Flower?
 
+    @Query("SELECT * FROM flowers ORDER BY rarity DESC, id ASC")
+    fun observeAll(): kotlinx.coroutines.flow.Flow<List<Flower>>
 
+    @Query("SELECT * FROM flowers")
+    suspend fun getAllOnce(): List<Flower>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(flower: Flower)
+
+    @Query("UPDATE flowers SET found = 1 WHERE name = :name")
+    suspend fun setFound(name: String)
 }

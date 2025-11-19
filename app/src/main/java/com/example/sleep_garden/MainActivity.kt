@@ -41,8 +41,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.FilledTonalButton
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.sleep_garden.data.flower.Zukan
-
+import com.example.sleep_garden.data.flower.FlowerViewModel
+import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 class MainActivity : ComponentActivity() {
@@ -50,14 +53,13 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ★ 次回起動時のスタート画面を決める（睡眠中なら "sleep"）
+        // 次回起動時のスタート画面（睡眠中なら "sleep"）
         val initialRoute = if (isSleepActive(this)) "sleep" else "home"
 
         setContent {
             val systemDark = isSystemInDarkTheme()
             var isDark by rememberSaveable { mutableStateOf(systemDark) }
             val scheme = if (isDark) darkColorScheme() else lightColorScheme()
-            var showZukan by rememberSaveable { mutableStateOf(false) }
 
             MaterialTheme(colorScheme = scheme) {
                 val nav = rememberNavController()
@@ -72,31 +74,31 @@ class MainActivity : ComponentActivity() {
                             onAlarmClick = { nav.navigate("alarm") },
                             onDexClick = { nav.navigate("zukan") },
                             onSleepClick = {
-                                // ★ 睡眠フラグON + 開始時刻保存 → sleep へ
                                 setSleepActive(applicationContext, true)
                                 setSleepStartAt(applicationContext, System.currentTimeMillis())
                                 nav.navigate("sleep") { launchSingleTop = true }
                             }
                         )
                     }
+
+                    // 図鑑
                     composable("zukan") {
                         Zukan(onBack = { nav.popBackStack() })
                     }
 
                     // スリープ画面（アプリ内フルスクリーン表示）
                     composable("sleep") {
-                        // ★ onWake は「ポップアップ閉鎖後にHomeへ戻る」ための遷移だけを担当
                         SleepScreen(
                             onWake = {
                                 nav.navigate("home") {
                                     launchSingleTop = true
-                                    popUpTo("home") { inclusive = true } // Homeを一枚だけに
+                                    popUpTo("home") { inclusive = true }
                                 }
                             }
                         )
                     }
 
-                    // 既存アラーム画面
+                    // アラーム画面
                     composable("alarm") {
                         com.example.sleep_garden.alarm.AlarmScreen(
                             onBack = { nav.popBackStack() },
@@ -104,8 +106,6 @@ class MainActivity : ComponentActivity() {
                             onToggleTheme = { isDark = !isDark }
                         )
                     }
-
-
                 }
             }
         }
@@ -123,15 +123,13 @@ private fun HomeScreen(
     onDexClick: () -> Unit,
     onSleepClick: () -> Unit
 ) {
-    // ▼ 追加：XP表示のための状態（起動/復帰時に最新反映）
     val ctx = LocalContext.current
-    val xpRepo = remember { com.example.sleep_garden.data.XpRepository.getInstance(ctx) }
+    val xpRepo = remember { XpRepository.getInstance(ctx) }
 
     var level by remember { mutableStateOf(xpRepo.getLevel()) }
     var currentXp by remember { mutableStateOf(xpRepo.getXp()) }
     var nextReq by remember { mutableStateOf(xpRepo.getRequiredXpFor(level)) }
 
-    // Home に戻ってきた時点で最新値を反映
     LaunchedEffect(Unit) {
         level = xpRepo.getLevel()
         currentXp = xpRepo.getXp()
@@ -139,11 +137,10 @@ private fun HomeScreen(
     }
 
     val progress = remember(level, currentXp, nextReq) {
-        if (level >= com.example.sleep_garden.data.XpRepository.MAX_LEVEL) 1f
+        if (level >= XpRepository.MAX_LEVEL) 1f
         else if (nextReq <= 0) 0f
         else (currentXp.toFloat() / nextReq.toFloat()).coerceIn(0f, 1f)
     }
-    // ▲ ここまで追加
 
     Scaffold(
         topBar = {
@@ -166,7 +163,6 @@ private fun HomeScreen(
                 .fillMaxSize()
                 .padding(inner)
         ) {
-            // 背景
             Image(
                 painter = painterResource(R.drawable.home),
                 contentDescription = "background",
@@ -174,13 +170,12 @@ private fun HomeScreen(
                 contentScale = ContentScale.Crop
             )
 
-            // ===== 上部：XPバー（追加） + 下部：既存ボタン群 =====
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // ▼ 追加：XPパネル
+                // XPパネル
                 Surface(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
                     shape = RoundedCornerShape(14.dp),
@@ -198,7 +193,7 @@ private fun HomeScreen(
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                                 color = MaterialTheme.colorScheme.onSurface
                             )
-                            if (level < com.example.sleep_garden.data.XpRepository.MAX_LEVEL) {
+                            if (level < XpRepository.MAX_LEVEL) {
                                 Text(
                                     text = "$currentXp / $nextReq XP",
                                     style = MaterialTheme.typography.titleMedium,
@@ -224,11 +219,9 @@ private fun HomeScreen(
                         )
                     }
                 }
-                // ▲ ここまでXPパネル
 
-                Spacer(Modifier.weight(1f)) // 下のボタン群を最下段へ寄せる
+                Spacer(Modifier.weight(1f))
 
-                // ===== 画面最下端（安全エリア下端）にボタン群を吸着（既存そのまま） =====
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val buttonScale = 1.18f
                     val rowBtnHeight  = (maxWidth * 0.24f * buttonScale).coerceIn(120.dp, 208.dp)
@@ -236,7 +229,6 @@ private fun HomeScreen(
                     val innerPadRow   = rowBtnHeight * 0.09f
                     val innerPadWide  = wideBtnHeight * 0.09f
 
-                    // ▼ 下げ幅をここで調整（例: 10.dp → 24.dp）
                     val buttonsYOffset = 22.dp
 
                     Column(
@@ -247,11 +239,10 @@ private fun HomeScreen(
                         verticalArrangement = Arrangement.Bottom,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 上段2ボタン
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .offset(y = 17.dp) // 上段だけ少し下げる
+                                .offset(y = 17.dp)
                                 .padding(horizontal = 6.dp),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
@@ -277,7 +268,6 @@ private fun HomeScreen(
                             )
                         }
 
-                        // 下段ワイド（寝る・成長）
                         ImageButton(
                             resId = R.drawable.btn_sleep,
                             contentDesc = "寝る・成長",
@@ -296,23 +286,31 @@ private fun HomeScreen(
     }
 }
 
-
-/* ---------------- スリープ画面（アプリ内フルスクリーン + 起きるボタン + 獲得XPポップアップ） ---------------- */
+/* ---------------- スリープ画面（起きる → XP + ランダム花） ---------------- */
 
 @Composable
 private fun SleepScreen(
-
-    onWake: () -> Unit // ← ポップアップを閉じた後に呼ぶ（= Homeに戻る）
+    onWake: () -> Unit
 ) {
     val ctx = LocalContext.current
+    val flowerVm: FlowerViewModel = viewModel()
+    val scope = rememberCoroutineScope()
 
-    // ポップアップ表示用の状態
+
+    // 図鑑初期データがまだなら投入
+    LaunchedEffect(Unit) {
+        flowerVm.insertInitialFlowers()
+    }
+
     var showGained by remember { mutableStateOf(false) }
     var gainedAmount by remember { mutableStateOf(0) }
     var popupLevel by remember { mutableStateOf(1) }
     var popupCurrentXp by remember { mutableStateOf(0) }
     var popupNextReq by remember { mutableStateOf(0) }
     var popupLeveledTo by remember { mutableStateOf<Int?>(null) }
+    var rewardedFlowerName by remember { mutableStateOf<String?>(null) }
+    var rewardedFlowerImageResId by remember { mutableStateOf<Int?>(null) }
+
 
     Box(
         modifier = Modifier
@@ -341,11 +339,11 @@ private fun SleepScreen(
                     .clip(RoundedCornerShape(8.dp))
                     .clickable(
                         onClick = {
-                            // ★ 起きる押下：ここでXP計算 → ポップアップ表示
                             val start = getSleepStartAt(ctx) ?: System.currentTimeMillis()
                             val minutes = max(0, ((System.currentTimeMillis() - start) / 60_000L).toInt())
 
                             val xpRepo = XpRepository.getInstance(ctx)
+
                             val result = xpRepo.addXpAndLevelUp(minutes)
 
                             gainedAmount = result.added
@@ -353,7 +351,15 @@ private fun SleepScreen(
                             popupCurrentXp = result.newXp
                             popupNextReq = result.newRequired
                             popupLeveledTo = result.leveledUpTo
+
+// ★ ランダム花報酬
+                            scope.launch {
+                                val rewarded = flowerVm.rewardRandomFlowerIfEligible(minutes)
+                                rewardedFlowerName = rewarded?.name
+                                rewardedFlowerImageResId = rewarded?.imageResId
+                            }
                             showGained = true
+
                         }
                     )
             ) {
@@ -368,7 +374,6 @@ private fun SleepScreen(
             }
         }
 
-        // ★ 獲得XPポップアップ（閉じたらフラグOFF→開始時刻クリア→Homeへ）
         if (showGained) {
             GainedXpPopup(
                 gained = gainedAmount,
@@ -376,18 +381,21 @@ private fun SleepScreen(
                 currentXp = popupCurrentXp,
                 nextReq = popupNextReq,
                 leveledUpTo = popupLeveledTo,
+                rewardedFlowerName = rewardedFlowerName,
+                rewardedFlowerImageResId = rewardedFlowerImageResId,
                 onDismiss = {
                     setSleepActive(ctx, false)
                     setSleepStartAt(ctx, null)
                     showGained = false
-                    onWake() // ← Homeへ戻る
+                    rewardedFlowerName = null
+                    onWake()
                 }
             )
         }
     }
 }
 
-/* ---------------- 画像そのものを押せるボタン（中身は余白で縮小） ---------------- */
+/* ---------------- 画像ボタン ---------------- */
 
 @Composable
 private fun ImageButton(
@@ -408,7 +416,7 @@ private fun ImageButton(
             .clip(RoundedCornerShape(corner))
             .indication(interaction, ripple())
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(contentPadding) // 画像だけ一回り内側へ（見切れ防止）
+            .padding(contentPadding)
     ) {
         Image(
             painter = painterResource(resId),
@@ -420,7 +428,7 @@ private fun ImageButton(
     }
 }
 
-/* ---------------- シンプルな永続フラグ（睡眠中かどうか） ---------------- */
+/* ---------------- 睡眠フラグ & 開始時刻 ---------------- */
 
 private fun isSleepActive(ctx: Context): Boolean =
     ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
@@ -432,8 +440,6 @@ private fun setSleepActive(ctx: Context, value: Boolean) {
         .putBoolean("sleep_active", value)
         .apply()
 }
-
-/* ---------------- 追加：睡眠開始時刻の保存/取得（XP計算のため） ---------------- */
 
 private fun getSleepStartAt(ctx: Context): Long? {
     val t = ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
@@ -448,7 +454,7 @@ private fun setSleepStartAt(ctx: Context, timeMillis: Long?) {
         .apply()
 }
 
-/* ---------------- 追加：獲得XPポップアップ（詳細付き） ---------------- */
+/* ---------------- 獲得XP + ごほうび花ポップアップ ---------------- */
 
 @Composable
 private fun GainedXpPopup(
@@ -456,8 +462,11 @@ private fun GainedXpPopup(
     newLevel: Int,
     currentXp: Int,
     nextReq: Int,
-    leveledUpTo: Int?, // nullで「レベルアップなし」
+    leveledUpTo: Int?,            // null = レベルアップなし
+    rewardedFlowerName: String?,  // ★ 追加：報酬の花の名前
+    rewardedFlowerImageResId: Int?, // ★ 追加：報酬の花の画像
     onDismiss: () -> Unit
+
 ) {
     Box(
         modifier = Modifier
@@ -467,29 +476,36 @@ private fun GainedXpPopup(
         contentAlignment = Alignment.Center
     ) {
         Surface(
-            shape = RoundedCornerShape(16.dp),
-            tonalElevation = 6.dp,
+            shape = RoundedCornerShape(50.dp),
+            tonalElevation = 8.dp,
             modifier = Modifier
-                .padding(24.dp)
+                .fillMaxWidth(0.98f)
+                .wrapContentHeight()
+                .padding(20.dp)
                 .clickable(enabled = false) {}
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(30.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+
+                // ---- タイトル ----
                 Text(
                     text = "獲得XP",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(20.dp))
+
+                // ---- 獲得XP ----
                 Text(
                     text = "+$gained XP",
                     style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(26.dp))
 
+                // ---- レベルアップ ----
                 if (leveledUpTo != null) {
                     Text(
                         text = "レベルアップ！ → Lv $leveledUpTo",
@@ -499,6 +515,7 @@ private fun GainedXpPopup(
                     Spacer(Modifier.height(6.dp))
                 }
 
+                // ---- 現在レベル ----
                 Text(
                     text = "現在レベル：Lv $newLevel",
                     style = MaterialTheme.typography.titleMedium,
@@ -506,6 +523,7 @@ private fun GainedXpPopup(
                 )
                 Spacer(Modifier.height(6.dp))
 
+                // ---- 次のレベルまで ----
                 if (newLevel < XpRepository.MAX_LEVEL) {
                     Text(
                         text = "次のレベルまで：${(nextReq - currentXp).coerceAtLeast(0)} XP",
@@ -515,12 +533,47 @@ private fun GainedXpPopup(
                 } else {
                     Text(
                         text = "レベルは最大です",
-                        style = MaterialTheme.typography.bodyMedium, // ← 既存に合わせてください。typography なら修正: MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
-                Spacer(Modifier.height(10.dp))
+                // ================================
+                // ★ 報酬の花表示ブロック（追加）
+                // ================================
+                if (rewardedFlowerName != null) {
+                    Spacer(Modifier.height(20.dp))
+
+                    Text(
+                        text = "ごほうびの花！",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Spacer(Modifier.height(8.dp))
+
+                    Text(
+                        text = rewardedFlowerName,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+
+                    // 画像
+                    rewardedFlowerImageResId?.let { resId ->
+                        Spacer(Modifier.height(12.dp))
+                        Image(
+                            painter = painterResource(resId),
+                            contentDescription = rewardedFlowerName,
+                            modifier = Modifier
+                                .size(230.dp)
+                                .clip(RoundedCornerShape(16.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+
+                // ---- 閉じる ----
+                Spacer(Modifier.height(20.dp))
                 Text(
                     text = "タップで閉じる",
                     style = MaterialTheme.typography.labelMedium,
