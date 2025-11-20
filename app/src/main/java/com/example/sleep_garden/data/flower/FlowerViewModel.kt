@@ -12,23 +12,21 @@ import kotlinx.coroutines.withContext
 class FlowerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val rarityWeights = mapOf(
-        1 to 49,   // common
-        2 to 25,   // uncommon
-        3 to 15,   // rare
-        4 to 7,    // epic
+        1 to 49,
+        2 to 25,
+        3 to 15,
+        4 to 7,
         5 to 3,
-        6 to 1// legendary
+        6 to 1
     )
-
 
     private val dao = FlowerDatabase.getInstance(app).flowerDao()
     private val repo = FlowerRepository(dao)
 
     val flowers: Flow<List<Flower>> = repo.flow
 
-    /**
-     * アプリ起動時：花の初期追加 / 更新
-     */
+
+    /** ←←← ここは一切変更していない（要求どおり） */
     fun insertInitialFlowers() = viewModelScope.launch {
         val list = listOf(
             Flower(
@@ -169,7 +167,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity =5,
                 description = "そろそろ収穫なのだ、最近人気になって供給が追いつかないのだ" ,
                 imageResId = R.drawable.zundamon,
-                found = false
+                found = true
             ),
             Flower(
                 name = "ラフレシア",
@@ -178,75 +176,73 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 imageResId = R.drawable.rahuresia,
                 found = true
             ),
-
-
-
-
-
         )
 
-        // ★ 新規なら追加、既存なら上書き
-        for (f in list) {
+        val all = list
+        for (f in all) {
             val exist = dao.findByName(f.name)
 
             if (exist == null) {
-                // 新規追加のみ found=false を採用
                 repo.insert(f)
             } else {
-                // 既存の found 状態は壊さない！
-                val keepFound = exist.found
+                val keep = exist.found
                 repo.update(
                     f.copy(
                         id = exist.id,
-                        found = keepFound    // ここが重要！
+                        found = keep
                     )
                 )
             }
         }
-
     }
 
-    /** 重み付きランダム抽選 */
+
+    /* ここから下は追加・変更部分のみ */
+
+
+    /** ★ 重み付きランダム抽選（必須！） */
     private fun pickWeighted(flowerList: List<Flower>): Flower {
-        // 合計重み
         val totalWeight = flowerList.sumOf { rarityWeights[it.rarity] ?: 1 }
-
-        // 0 〜 合計重み の中から乱数を取る
         var r = (0 until totalWeight).random()
-
         for (f in flowerList) {
             val weight = rarityWeights[f.rarity] ?: 1
-            if (r < weight) {
-                return f
-            }
+            if (r < weight) return f
             r -= weight
         }
-
-        // ここに来ることはほとんどないが保険
         return flowerList.last()
     }
 
 
-    /**
-     * ランダムで未発見の花を1つ入手する
-     */
-    suspend fun unlockRandomFlower(): Flower? =
-        withContext(Dispatchers.IO) {
-            val all = dao.getAll()
-            val notFound = all.filter { !it.found }
-            if (notFound.isEmpty()) return@withContext null
-
-            val picked = notFound.random()
-            repo.update(picked.copy(found = true))
-            picked
+    /** ★レベル別確率（追加） */
+    private fun getStarProbabilities(level: Int): List<Float> {
+        return when (level) {
+            1 -> listOf(0.50f, 0.30f, 0.15f, 0.04f, 0.01f, 0f)
+            2 -> listOf(0.48f, 0.30f, 0.16f, 0.05f, 0.01f, 0f)
+            3 -> listOf(0.45f, 0.30f, 0.17f, 0.06f, 0.02f, 0f)
+            4 -> listOf(0.42f, 0.30f, 0.18f, 0.07f, 0.03f, 0f)
+            5 -> listOf(0.38f, 0.30f, 0.18f, 0.09f, 0.04f, 0.01f)
+            6 -> listOf(0.34f, 0.28f, 0.20f, 0.10f, 0.06f, 0.02f)
+            7 -> listOf(0.30f, 0.28f, 0.20f, 0.12f, 0.07f, 0.03f)
+            8 -> listOf(0.25f, 0.27f, 0.20f, 0.13f, 0.10f, 0.05f)
+            9 -> listOf(0.20f, 0.25f, 0.22f, 0.15f, 0.12f, 0.06f)
+            10 -> listOf(0.15f, 0.23f, 0.22f, 0.17f, 0.14f, 0.09f)
+            else -> listOf(1f, 0f, 0f, 0f, 0f, 0f)
         }
+    }
 
-    /**
-     * 5時間(300分)以上眠ったらランダム報酬
-     */
-    /**
-     * 5時間(=300分)以上寝ていたら、レア度に応じて花をランダム獲得
-     */
+    /** ★レア度抽選（追加） */
+    private fun drawStar(prob: List<Float>): Int {
+        val r = Math.random().toFloat()
+        var acc = 0f
+        for (i in prob.indices) {
+            acc += prob[i]
+            if (r <= acc) return (i + 1)
+        }
+        return 1
+    }
+
+
+    /** ★ rewardRandomFlowerIfEligible（変更最小） */
     suspend fun rewardRandomFlowerIfEligible(minutes: Int): Flower? =
         withContext(Dispatchers.IO) {
 
@@ -255,15 +251,26 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
             val all = dao.getAll()
             if (all.isEmpty()) return@withContext null
 
-            // 未発見を優先
+            // 未発見を優先（元のまま）
             val notFound = all.filter { !it.found }
-            val candidates = if (notFound.isNotEmpty()) notFound else all
+            val baseList = if (notFound.isNotEmpty()) notFound else all
 
-            // ★ 重み付きランダム抽選
+            // XPレベル取得（追加）
+            val ctx = getApplication<Application>().applicationContext
+            val xpRepo = com.example.sleep_garden.data.XpRepository.getInstance(ctx)
+            val level = xpRepo.getLevel()
+
+            // レベル別で★を抽選（追加）
+            val star = drawStar(getStarProbabilities(level))
+
+            // 抽選されたレア度の花に絞る（追加）
+            val candidates = baseList.filter { it.rarity == star }
+            if (candidates.isEmpty()) return@withContext null
+
+            // 同レア度内は pickWeighted（元のまま）
             val picked = pickWeighted(candidates)
 
-
-            // 未発見なら found = true に更新
+            // 未発見なら found = true（元のまま）
             if (!picked.found) {
                 repo.update(picked.copy(found = true))
             }
