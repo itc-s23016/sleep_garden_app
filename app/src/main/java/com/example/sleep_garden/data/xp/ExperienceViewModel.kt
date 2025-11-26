@@ -19,13 +19,24 @@ class ExperienceViewModel(app: Application) : AndroidViewModel(app) {
     val summary = repo.observeSummary()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    /** 「起きる」押下時に呼ぶ */
-    fun onWakeConfirm(sleepAtMillis: Long, wakeAtMillis: Long, note: String? = null,
-                      onResult: (XpResult) -> Unit,
-                      onError: (Throwable) -> Unit = {}
+    /**
+     * effectiveDuration = SleepScreen で半減された値
+     */
+    fun onWakeConfirm(
+        sleepAtMillis: Long,
+        wakeAtMillis: Long,
+        effectiveDuration: Int,
+        note: String? = null,
+        onResult: (XpResult) -> Unit,
+        onError: (Throwable) -> Unit = {}
     ) = viewModelScope.launch(Dispatchers.IO) {
         try {
-            val result = repo.recordSleep(sleepAtMillis, wakeAtMillis, note)
+            val result = repo.recordSleep(
+                sleepAtMillis = sleepAtMillis,
+                wakeAtMillis = wakeAtMillis,
+                effectiveDurationMin = effectiveDuration,
+                note = note
+            )
             withContext(Dispatchers.Main) { onResult(result) }
         } catch (t: Throwable) {
             withContext(Dispatchers.Main) { onError(t) }

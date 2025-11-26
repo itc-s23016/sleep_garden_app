@@ -20,16 +20,28 @@ class ExperienceRepository(
     fun observeSummary(): Flow<XpSummaryEntity?> = dao.observeSummary()
 
     /**
-     * 就寝～起床の確定時に呼ぶ。
-     * durationMin は (wake - sleep) から自動算出。
+     * 睡眠記録を保存。
+     * effectiveDurationMin は SleepScreen 側で
+     * ・通常時 = 実際の睡眠時間
+     * ・スヌーズ時 = duration / 2
+     * として渡される。
      */
-    suspend fun recordSleep(sleepAtMillis: Long, wakeAtMillis: Long, note: String? = null): XpResult {
-        val durMin = max(0, ((wakeAtMillis - sleepAtMillis) / 60000L).toInt())
-        val gained = XpFormula.gained(durMin)
+    suspend fun recordSleep(
+        sleepAtMillis: Long,
+        wakeAtMillis: Long,
+        effectiveDurationMin: Int,
+        note: String?
+    ): XpResult {
+
+        val durationMin = max(0, ((wakeAtMillis - sleepAtMillis) / 60000L).toInt())
+
+        // ★半減済みの XP を使う
+        val gained = XpFormula.gained(effectiveDurationMin)
+
         val session = XpSessionEntity(
             sleepAtMillis = sleepAtMillis,
             wakeAtMillis = wakeAtMillis,
-            durationMin = durMin,
+            durationMin = durationMin,
             gainedXp = gained,
             note = note
         )
@@ -54,6 +66,7 @@ class ExperienceRepository(
             )
             dao.upsertSummary(updatedSummary)
         }
+
         return XpResult(inserted, updatedSummary, levelInfo)
     }
 }
