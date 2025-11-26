@@ -74,7 +74,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
             Flower(
                 name = "ガーベラ",
                 rarity =2,
-                description = "チェンソーマンにレぜにあげる花。花言葉は色によりけり" ,
+                description = "チェンソーマンにレぜがあげる花。花言葉は色によりけり" ,
                 imageResId = R.drawable.gabera,
                 found = true
             ),

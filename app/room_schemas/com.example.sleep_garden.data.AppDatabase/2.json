@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "8fcd8d38faa5cbf34fa331e2df5d34a0",
+    "identityHash": "b9eb8cc3b14c7b08de888b5cdd20d469",
     "entities": [
       {
         "tableName": "alarms",
@@ -50,7 +50,7 @@
       },
       {
         "tableName": "xp_session",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `sleepAtMillis` INTEGER NOT NULL, `wakeAtMillis` INTEGER NOT NULL, `durationMin` INTEGER NOT NULL, `gainedXp` INTEGER NOT NULL, `note` TEXT, `createdAtMillis` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `sleepAtMillis` INTEGER NOT NULL, `wakeAtMillis` INTEGER NOT NULL, `durationMin` INTEGER NOT NULL, `gainedXp` INTEGER NOT NULL, `note` TEXT, `createdAtMillis` INTEGER NOT NULL, PRIMARY KEY(`id`))",
         "fields": [
           {
             "fieldPath": "id",
@@ -96,7 +96,7 @@
           }
         ],
         "primaryKey": {
-          "autoGenerate": true,
+          "autoGenerate": false,
           "columnNames": [
             "id"
           ]
@@ -146,7 +146,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '8fcd8d38faa5cbf34fa331e2df5d34a0')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'b9eb8cc3b14c7b08de888b5cdd20d469')"
     ]
   }
 }
