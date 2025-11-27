@@ -36,14 +36,14 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.example.sleep_garden.data.flower.Zukan
 import com.example.sleep_garden.data.flower.FlowerViewModel
+import com.example.sleep_garden.data.flower.Zukan
 import com.example.sleep_garden.data.xp.ExperienceViewModel
 import com.example.sleep_garden.data.xp.XpResult
 import kotlinx.coroutines.launch
 import kotlin.math.max
 
-/* ------------------- スヌーズ管理 ------------------- */
+/* ------------------- スヌーズ状態管理 ------------------- */
 
 fun setSnoozed(ctx: Context, value: Boolean) {
     ctx.getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
 
                 NavHost(navController = nav, startDestination = initialRoute) {
 
-                    /* --------- Home画面 --------- */
+                    /* -------- Home -------- */
                     composable("home") {
                         HomeScreen(
                             isDark = isDark,
@@ -92,12 +92,12 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    /* --------- 図鑑 --------- */
+                    /* -------- 図鑑 -------- */
                     composable("zukan") {
                         Zukan(onBack = { nav.popBackStack() })
                     }
 
-                    /* --------- 睡眠画面 --------- */
+                    /* -------- 睡眠 -------- */
                     composable("sleep") {
                         SleepScreen(
                             onWake = {
@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    /* --------- アラーム画面 --------- */
+                    /* -------- アラーム -------- */
                     composable("alarm") {
                         com.example.sleep_garden.alarm.AlarmScreen(
                             onBack = { nav.popBackStack() },
@@ -124,7 +124,7 @@ class MainActivity : ComponentActivity() {
 }
 
 
-/* ------------------- SleepScreen（完全版） ------------------- */
+/* ------------------- SleepScreen（完全修正版） ------------------- */
 
 @Composable
 fun SleepScreen(onWake: () -> Unit) {
@@ -135,7 +135,7 @@ fun SleepScreen(onWake: () -> Unit) {
 
     var showPopup by remember { mutableStateOf(false) }
 
-    // XP表⽰
+    // XP 表示
     var gainedXp by remember { mutableStateOf(0) }
     var level by remember { mutableStateOf(1) }
     var progress by remember { mutableStateOf(0) }
@@ -145,6 +145,9 @@ fun SleepScreen(onWake: () -> Unit) {
     // 花
     var rewardName by remember { mutableStateOf<String?>(null) }
     var rewardImage by remember { mutableStateOf<Int?>(null) }
+
+    // 多重タップ防止
+    var processing by remember { mutableStateOf(false) }
 
     // 図鑑初期データ投入
     LaunchedEffect(Unit) { flowerVm.insertInitialFlowers() }
@@ -173,51 +176,57 @@ fun SleepScreen(onWake: () -> Unit) {
                     .clip(RoundedCornerShape(8.dp))
                     .clickable {
 
-                        val sleepAt = getSleepStartAt(ctx) ?: System.currentTimeMillis()
-                        val wakeAt = System.currentTimeMillis()
-                        val durationMin = max(0, ((wakeAt - sleepAt) / 60000).toInt())
-                        val snoozed = wasSnoozed(ctx)
+                        if (processing) return@clickable
+                        processing = true
 
-                        // ★ XP 半減
-                        val effectiveDuration = if (snoozed) durationMin / 2 else durationMin
+                        scope.launch {
 
-                        // ★ 花（スヌーズ時はなし）
-                        if (!snoozed) {
-                            scope.launch {
+                            val sleepAt = getSleepStartAt(ctx) ?: System.currentTimeMillis()
+                            val wakeAt = System.currentTimeMillis()
+                            val durationMin = max(0, ((wakeAt - sleepAt) / 60000).toInt())
+                            val snoozed = wasSnoozed(ctx)
+
+                            // XP 半減
+                            val effectiveDuration =
+                                if (snoozed) durationMin / 2 else durationMin
+
+                            // 花（スヌーズ時は無し）
+                            if (!snoozed) {
                                 val result = flowerVm.rewardRandomFlowerIfEligible(durationMin)
                                 rewardName = result?.name
                                 rewardImage = result?.imageResId
+                            } else {
+                                rewardName = null
+                                rewardImage = null
                             }
-                        } else {
-                            rewardName = null
-                            rewardImage = null
+
+                            // XP 保存（半減後）
+                            xpVm.onWakeConfirm(
+                                sleepAtMillis = sleepAt,
+                                wakeAtMillis = wakeAt,
+                                note = if (snoozed) "SNOOZE" else null,
+                                effectiveDurationMin = effectiveDuration,
+                                onResult = { r: XpResult ->
+                                    gainedXp = r.session.gainedXp
+                                    level = r.summary.level
+                                    progress = r.levelInfo.progressInLevel
+                                    needForNext = r.levelInfo.needForNext
+
+                                    leveledTo =
+                                        if (r.levelInfo.progressInLevel == 0)
+                                            r.summary.level
+                                        else null
+
+                                    showPopup = true
+                                },
+                                onError = { processing = false }
+                            )
+
+                            // 状態リセット
+                            setSleepActive(ctx, false)
+                            setSleepStartAt(ctx, null)
+                            setSnoozed(ctx, false)
                         }
-
-                        // ★ 新XP保存
-                        xpVm.onWakeConfirm(
-                            sleepAtMillis = sleepAt,
-                            wakeAtMillis = wakeAt,
-                            note = if (snoozed) "SNOOZE" else null,
-                            effectiveDuration = effectiveDuration,
-                            onResult = { r: XpResult ->
-                                gainedXp = r.session.gainedXp
-                                level = r.summary.level
-                                progress = r.levelInfo.progressInLevel
-                                needForNext = r.levelInfo.needForNext
-
-                                leveledTo =
-                                    if (r.levelInfo.progressInLevel == 0)
-                                        r.summary.level
-                                    else null
-
-                                showPopup = true
-                            }
-                        )
-
-                        // 状態リセット
-                        setSleepActive(ctx, false)
-                        setSleepStartAt(ctx, null)
-                        setSnoozed(ctx, false)
                     }
             ) {
                 Image(
@@ -314,9 +323,9 @@ fun SleepResultPopup(
                     Text("レベルは最大です")
                 }
 
-                // 花
+                // 花（スヌーズ時は出ない）
                 rewardName?.let { name ->
-                    Spacer(Modifier.height(24.dp))
+                    Spacer(Modifier.height(26.dp))
                     Text(
                         "ごほうびの花",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
@@ -338,7 +347,7 @@ fun SleepResultPopup(
                     }
                 }
 
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(26.dp))
                 Text("タップで閉じる", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
@@ -373,7 +382,7 @@ private fun setSleepStartAt(ctx: Context, timeMillis: Long?) {
 }
 
 
-/* ------------------- ImageButton（共通UI） ------------------- */
+/* ------------------- ImageButton 共通UI ------------------- */
 
 @Composable
 private fun ImageButton(
@@ -413,7 +422,7 @@ private fun ImageButton(
 }
 
 
-/* ------------------- HomeScreen（完全一体版） ------------------- */
+/* ------------------- HomeScreen（完全修正版） ------------------- */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -425,22 +434,21 @@ fun HomeScreen(
     onSleepClick: () -> Unit
 ) {
     val ctx = LocalContext.current
-    val xpRepo = remember { com.example.sleep_garden.data.XpRepository.getInstance(ctx) }
+    val xpVm: ExperienceViewModel = viewModel()
 
-    var level by remember { mutableStateOf(xpRepo.getLevel()) }
-    var currentXp by remember { mutableStateOf(xpRepo.getXp()) }
-    var nextReq by remember { mutableStateOf(xpRepo.getRequiredXpFor(level)) }
+    // XP summary（Roomから取得）
+    val summary by xpVm.summary.collectAsState()
 
-    LaunchedEffect(Unit) {
-        level = xpRepo.getLevel()
-        currentXp = xpRepo.getXp()
-        nextReq = xpRepo.getRequiredXpFor(level)
+    val level = summary?.level ?: 1
+    val totalXp = summary?.totalXp ?: 0
+
+    val levelInfo = remember(level, totalXp) {
+        com.example.sleep_garden.data.xp.Leveling.compute(totalXp)
     }
 
-    val progress = remember(level, currentXp, nextReq) {
-        if (level >= com.example.sleep_garden.data.XpRepository.MAX_LEVEL) 1f
-        else if (nextReq <= 0) 0f
-        else (currentXp.toFloat() / nextReq.toFloat()).coerceIn(0f, 1f)
+    val progress = remember(levelInfo) {
+        if (levelInfo.needForNext == 0) 1f
+        else levelInfo.progressInLevel.toFloat() / levelInfo.needForNext.toFloat()
     }
 
     Scaffold(
@@ -474,7 +482,8 @@ fun HomeScreen(
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
-                // XP パネル
+
+                /* ---- XP パネル ---- */
                 Surface(
                     color = MaterialTheme.colorScheme.surface.copy(alpha = 0.82f),
                     shape = RoundedCornerShape(14.dp),
@@ -482,6 +491,7 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
+
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -491,8 +501,9 @@ fun HomeScreen(
                                 "Lv $level",
                                 style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                             )
-                            if (level < com.example.sleep_garden.data.XpRepository.MAX_LEVEL) {
-                                Text("$currentXp / $nextReq XP")
+
+                            if (level < com.example.sleep_garden.data.xp.Leveling.MAX_LEVEL) {
+                                Text("${levelInfo.progressInLevel} / ${levelInfo.needForNext} XP")
                             } else {
                                 Text("MAX")
                             }
@@ -514,7 +525,7 @@ fun HomeScreen(
 
                 Spacer(Modifier.weight(1f))
 
-                // ボタン
+                /* ---- ボタン ---- */
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val buttonScale = 1.18f
                     val rowBtnHeight =
