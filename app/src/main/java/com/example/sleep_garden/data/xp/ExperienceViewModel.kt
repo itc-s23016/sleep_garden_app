@@ -20,13 +20,13 @@ class ExperienceViewModel(app: Application) : AndroidViewModel(app) {
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     /**
-     * effectiveDuration = SleepScreen で半減された値
+     * 起床時に呼ぶ（★ XP を外部から渡す対応）
      */
     fun onWakeConfirm(
         sleepAtMillis: Long,
         wakeAtMillis: Long,
-        effectiveDuration: Int,
         note: String? = null,
+        effectiveDurationMin: Int,
         onResult: (XpResult) -> Unit,
         onError: (Throwable) -> Unit = {}
     ) = viewModelScope.launch(Dispatchers.IO) {
@@ -34,8 +34,8 @@ class ExperienceViewModel(app: Application) : AndroidViewModel(app) {
             val result = repo.recordSleep(
                 sleepAtMillis = sleepAtMillis,
                 wakeAtMillis = wakeAtMillis,
-                effectiveDurationMin = effectiveDuration,
-                note = note
+                note = note,
+                effectiveDurationMin = effectiveDurationMin
             )
             withContext(Dispatchers.Main) { onResult(result) }
         } catch (t: Throwable) {

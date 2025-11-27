@@ -3,7 +3,6 @@ package com.example.sleep_garden.data.xp
 import androidx.room.withTransaction
 import com.example.sleep_garden.data.AppDatabase
 import kotlinx.coroutines.flow.Flow
-import kotlin.math.max
 
 data class XpResult(
     val session: XpSessionEntity,
@@ -20,29 +19,22 @@ class ExperienceRepository(
     fun observeSummary(): Flow<XpSummaryEntity?> = dao.observeSummary()
 
     /**
-     * 睡眠記録を保存。
-     * effectiveDurationMin は SleepScreen 側で
-     * ・通常時 = 実際の睡眠時間
-     * ・スヌーズ時 = duration / 2
-     * として渡される。
+     * ★ XP は UI から渡す（スヌーズ時は半減済み）
      */
     suspend fun recordSleep(
         sleepAtMillis: Long,
         wakeAtMillis: Long,
-        effectiveDurationMin: Int,
-        note: String?
+        note: String?,
+        effectiveDurationMin: Int      // ←追加
     ): XpResult {
 
-        val durationMin = max(0, ((wakeAtMillis - sleepAtMillis) / 60000L).toInt())
-
-        // ★半減済みの XP を使う
-        val gained = XpFormula.gained(effectiveDurationMin)
+        val gainedXp = XpFormula.gained(effectiveDurationMin)
 
         val session = XpSessionEntity(
             sleepAtMillis = sleepAtMillis,
             wakeAtMillis = wakeAtMillis,
-            durationMin = durationMin,
-            gainedXp = gained,
+            durationMin = effectiveDurationMin,
+            gainedXp = gainedXp,
             note = note
         )
 
