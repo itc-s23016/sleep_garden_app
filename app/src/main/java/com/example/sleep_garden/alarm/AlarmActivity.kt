@@ -1,6 +1,5 @@
 package com.example.sleep_garden.alarm
 
-import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -12,7 +11,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.example.sleep_garden.MainActivity
 
 class AlarmActivity : ComponentActivity() {
 
@@ -23,7 +21,7 @@ class AlarmActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // ※ 音は AlarmRingtoneService が鳴らす
+        // ※ 音は AlarmRingtoneService が鳴らす。ここでは鳴らさない。
 
         setContent {
             MaterialTheme {
@@ -38,32 +36,27 @@ class AlarmActivity : ComponentActivity() {
                         )
                         Spacer(Modifier.height(40.dp))
 
-                        // ==== 停止ボタン ====
+                        // AlarmActivity.kt（停止ボタンの onClick だけ置き換え）
+
                         Button(
                             onClick = {
-                                // ❌ ここで snoozed=false にしていたのが原因
-                                // → STOP では「スヌーズ履歴」を消さない
-
-                                // サービス停止
-                                val stop = Intent(
-                                    this@AlarmActivity,
-                                    AlarmRingtoneService::class.java
-                                ).apply {
+                                // 1) 鳴動サービスを停止
+                                val alarmId = intent.getStringExtra("alarmId") ?: "default"
+                                val stop = Intent(this@AlarmActivity, AlarmRingtoneService::class.java).apply {
                                     action = AlarmRingtoneService.ACTION_STOP
                                     putExtra("alarmId", alarmId)
                                 }
                                 startService(stop)
 
-                                // アプリへ復帰（sleep_active=true なので SleepScreen へ）
+                                // 2) アプリ（MainActivity）を開く
                                 startActivity(
-                                    Intent(this@AlarmActivity, MainActivity::class.java).apply {
-                                        addFlags(
-                                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
-                                                    Intent.FLAG_ACTIVITY_SINGLE_TOP
-                                        )
+                                    Intent(this@AlarmActivity, com.example.sleep_garden.MainActivity::class.java).apply {
+                                        // 既存タスクがあればそれを前面に、なければ新規
+                                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                                     }
                                 )
 
+                                // 3) このフルスクリーン画面は閉じる
                                 finish()
                             },
                             modifier = Modifier.fillMaxWidth(0.6f)
@@ -73,23 +66,13 @@ class AlarmActivity : ComponentActivity() {
 
                         Spacer(Modifier.height(20.dp))
 
-                        // ==== スヌーズボタン ====
                         Button(
                             onClick = {
-                                // 🔥 スヌーズ履歴を保存（このフラグは SleepScreen まで持ち越す）
-                                val prefs = getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
-                                prefs.edit().putBoolean("snoozed", true).apply()
-
-                                // サービスにスヌーズアクション送信（1分後に再度鳴動）
                                 sendServiceAction(AlarmRingtoneService.ACTION_SNOOZE)
-
-                                // この画面は閉じる
                                 finish()
                             },
                             modifier = Modifier.fillMaxWidth(0.6f)
-                        ) {
-                            Text("スヌーズ（1分後）")
-                        }
+                        ) { Text("スヌーズ（1分後）") }
                     }
                 }
             }
@@ -102,6 +85,7 @@ class AlarmActivity : ComponentActivity() {
             this.action = action
             putExtra("alarmId", alarmId)
         }
+        // O+ は startForegroundService、それ未満は startService
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             ContextCompat.startForegroundService(this, intent)
         } else {
