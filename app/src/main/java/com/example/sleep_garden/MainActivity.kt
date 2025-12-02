@@ -1,7 +1,6 @@
 package com.example.sleep_garden
 
 import android.content.Context
-import android.media.AudioManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -166,7 +165,7 @@ private fun HomeScreen(
             CenterAlignedTopAppBar(
                 title = { Text("睡眠花育成", style = MaterialTheme.typography.titleLarge) },
                 actions = {
-                    IconButton(onClick = { showAlarmVolumePanel(ctx) }) {
+                    IconButton(onClick = {}) {
                         Icon(Icons.Filled.Notifications, contentDescription = null)
                     }
                     IconButton(onClick = onToggleTheme) {
@@ -302,16 +301,6 @@ private fun HomeScreen(
             }
         }
     }
-}
-
-/** システムの音量UIを開いて、アラーム音量を調整させる */
-private fun showAlarmVolumePanel(context: Context) {
-    val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    am.adjustStreamVolume(
-        AudioManager.STREAM_ALARM,
-        AudioManager.ADJUST_SAME,
-        AudioManager.FLAG_SHOW_UI
-    )
 }
 
 // ======================================================
