@@ -36,14 +36,14 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity = 3,
                 description = "太陽のように明るい花。黄色いだけがとりえ、種食われがち",
                 imageResId = R.drawable.himawari,
-                found = true
+                found = false
             ),
             Flower(
                 name = "さくら",
                 rarity = 4,
                 description = "春を彩る花。写真はイメージです。沖縄だと雑魚、満開なんて見れやしない.",
                 imageResId = R.drawable.hana,
-                found = true
+                found = false
             ),
             Flower(
                 name = "たんぽぽ",
@@ -130,9 +130,9 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 found = true
             ),
             Flower(
-                name = "わかめ",
+                name = "イシクラゲ",
                 rarity = 3,
-                description = "校庭などに、いつの間にか生えてくるわかめ、一応食べれるらしい。" ,
+                description = "校庭などに、いつの間にか生えてくる藻の一種、鉄分がぶどうの約３２倍あるらしい。" ,
                 imageResId = R.drawable.wakame,
                 found = true
             ),

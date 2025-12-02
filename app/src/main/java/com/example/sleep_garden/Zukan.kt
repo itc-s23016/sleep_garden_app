@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
@@ -28,7 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +57,12 @@ fun Zukan(
         else if (ctx is Activity) ctx.finish()
     }
 
+    // ★ レアリティごとにグルーピング（★1 → ★6）
+    val groupedByRarity: Map<Int, List<Flower>> =
+        flowers
+            .sortedBy { it.rarity }   // 一応ソート
+            .groupBy { it.rarity }    // rarity をキーにまとめる
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -68,7 +74,7 @@ fun Zukan(
                         style = MaterialTheme.typography.titleLarge
                     )
                 },
-                navigationIcon = {},  // 左側に何も置かない
+                navigationIcon = {},
                 actions = {
                     IconButton(onClick = { handleBack() }) {
                         Icon(
@@ -91,7 +97,7 @@ fun Zukan(
         ) {
 
             // ====================
-            //   花一覧
+            //   花一覧（レアリティ順）
             // ====================
             if (flowers.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -99,14 +105,26 @@ fun Zukan(
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
+                    columns = GridCells.Fixed(2),
                     contentPadding = PaddingValues(16.dp),
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    items(flowers, key = { it.id }) { f ->
-                        ZukanCell(f) { selected = f }
+                    // ★1 〜 ★6 の順で回して、あるレアリティだけ表示
+                    (1..6).forEach { star ->
+                        val list = groupedByRarity[star] ?: emptyList()
+                        if (list.isEmpty()) return@forEach
+
+                        // レアリティ見出し（4カラムぶち抜き）
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            RarityHeader(star = star)
+                        }
+
+                        // そのレアリティの花たち
+                        items(list, key = { it.id }) { f ->
+                            ZukanCell(f) { selected = f }
+                        }
                     }
                 }
             }
@@ -124,7 +142,7 @@ fun Zukan(
             }
 
             // ====================
-            //   花の詳細カード
+            //   花の詳細カード（元の仕様そのまま）
             // ====================
             selected?.let { f ->
                 Surface(
@@ -197,9 +215,8 @@ fun Zukan(
     }
 }
 
-
 /* ======================================================
-   グリッド用セル
+   グリッド用セル（元の仕様そのまま）
 ====================================================== */
 @Composable
 private fun ZukanCell(flower: Flower, onClick: () -> Unit) {
@@ -226,5 +243,63 @@ private fun ZukanCell(flower: Flower, onClick: () -> Unit) {
                 )
             }
         }
+    }
+}
+
+/* ======================================================
+   レアリティ見出し
+====================================================== */
+@Composable
+private fun RarityHeader(star: Int) {
+    val bg: Color
+    val label: String
+
+    when (star) {
+        1 -> {
+            bg = Color(0xFFE5E7EB) // グレー
+            label = "★1（よく見る花）"
+        }
+        2 -> {
+            bg = Color(0xFFBFDBFE) // 薄い青
+            label = "★2（ちょっとレア）"
+        }
+        3 -> {
+            bg = Color(0xFFA5B4FC) // 薄い紫
+            label = "★3（レア）"
+        }
+        4 -> {
+            bg = Color(0xFFFACC15) // 黄
+            label = "★4（スーパーレア）"
+        }
+        5 -> {
+            bg = Color(0xFFF97316) // オレンジ
+            label = "★5（ウルトラレア）"
+        }
+        6 -> {
+            bg = Color(0xFFFF4D94) // ピンク
+            label = "★6（ゴージャス）"
+        }
+        else -> {
+            bg = Color(0xFFE5E7EB)
+            label = "★$star"
+        }
+    }
+
+    Surface(
+        color = bg,
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            textAlign = TextAlign.Start,
+            color = Color.Black
+        )
     }
 }
