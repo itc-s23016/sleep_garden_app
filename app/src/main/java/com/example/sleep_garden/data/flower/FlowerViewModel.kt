@@ -50,7 +50,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity = 1,
                 description = "綿毛をとばして、黄色い花から綿に変化する。棉たまに飛ばずむしり取りがち。",
                 imageResId = R.drawable.tannpopo,
-                found = true
+                found = false
             ),
             Flower(
                 name = "バラ",
