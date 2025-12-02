@@ -1,9 +1,11 @@
 package com.example.sleep_garden.data.flower
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sleep_garden.R
+import com.example.sleep_garden.data.XpRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -181,7 +183,6 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         val all = list
         for (f in all) {
             val exist = dao.findByName(f.name)
-
             if (exist == null) {
                 repo.insert(f)
             } else {
@@ -195,7 +196,6 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
-
 
     /* ここから下は追加・変更部分のみ */
 
@@ -212,8 +212,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         return flowerList.last()
     }
 
-
-    /** ★レベル別確率（追加） */
+    /** レベルごとの★確率 */
     private fun getStarProbabilities(level: Int): List<Float> {
         return when (level) {
             1 -> listOf(0.50f, 0.30f, 0.15f, 0.04f, 0.01f, 0f)
@@ -230,7 +229,6 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** ★レア度抽選（追加） */
     private fun drawStar(prob: List<Float>): Int {
         val r = Math.random().toFloat()
         var acc = 0f
@@ -241,40 +239,46 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         return 1
     }
 
+    /**
+     * ★ ここが超重要 ★
+     * snoozed=true のときは「絶対に花を返さない（null）」。
+     */
+    suspend fun rewardRandomFlowerIfEligible(
+        minutes: Int,
+        snoozed: Boolean
+    ): Flower? = withContext(Dispatchers.IO) {
 
-    /** ★ rewardRandomFlowerIfEligible（変更最小） */
-    suspend fun rewardRandomFlowerIfEligible(minutes: Int): Flower? =
-        withContext(Dispatchers.IO) {
+        // スヌーズだったら絶対に花ガチャしない
+        if (snoozed) return@withContext null
 
-            if (minutes < 0.1) return@withContext null
+        // そもそも0分以下なら何も出さない
+        if (minutes <= 0) return@withContext null
 
-            val all = dao.getAll()
-            if (all.isEmpty()) return@withContext null
+        val all = dao.getAll()
+        if (all.isEmpty()) return@withContext null
 
-            // 未発見を優先（元のまま）
-            val notFound = all.filter { !it.found }
-            val baseList = if (notFound.isNotEmpty()) notFound else all
+        // 未発見を優先
+        val notFound = all.filter { !it.found }
+        val baseList = if (notFound.isNotEmpty()) notFound else all
 
-            // XPレベル取得（追加）
-            val ctx = getApplication<Application>().applicationContext
-            val xpRepo = com.example.sleep_garden.data.XpRepository.getInstance(ctx)
-            val level = xpRepo.getLevel()
+        // レベル取得
+        val ctx: Context = getApplication<Application>().applicationContext
+        val xpRepo = XpRepository.getInstance(ctx)
+        val level = xpRepo.getLevel()
 
-            // レベル別で★を抽選（追加）
-            val star = drawStar(getStarProbabilities(level))
+        // レア度（★）を抽選
+        val star = drawStar(getStarProbabilities(level))
+        val candidates = baseList.filter { it.rarity == star }
+        if (candidates.isEmpty()) return@withContext null
 
-            // 抽選されたレア度の花に絞る（追加）
-            val candidates = baseList.filter { it.rarity == star }
-            if (candidates.isEmpty()) return@withContext null
+        // 同じ★の中から重み付きで抽選
+        val picked = pickWeighted(candidates)
 
-            // 同レア度内は pickWeighted（元のまま）
-            val picked = pickWeighted(candidates)
-
-            // 未発見なら found = true（元のまま）
-            if (!picked.found) {
-                repo.update(picked.copy(found = true))
-            }
-
-            picked
+        // 未発見なら found=true に更新
+        if (!picked.found) {
+            repo.update(picked.copy(found = true))
         }
+
+        picked
+    }
 }

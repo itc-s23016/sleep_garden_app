@@ -1,5 +1,6 @@
 package com.example.sleep_garden.alarm
 
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -11,7 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.example.sleep_garden.setSnoozed    // ★ ここ重要（MainActivity側の関数）
+import com.example.sleep_garden.MainActivity
 
 class AlarmActivity : ComponentActivity() {
 
@@ -22,7 +23,7 @@ class AlarmActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        //（音は AlarmRingtoneService が鳴らす）
+        // ※ 音は AlarmRingtoneService が鳴らす
 
         setContent {
             MaterialTheme {
@@ -37,20 +38,29 @@ class AlarmActivity : ComponentActivity() {
                         )
                         Spacer(Modifier.height(40.dp))
 
-                        /* ------------------ 停止ボタン ------------------ */
+                        // ==== 停止ボタン ====
                         Button(
                             onClick = {
-                                // 1) 鳴動サービスを停止
-                                val stop = Intent(this@AlarmActivity, AlarmRingtoneService::class.java).apply {
+                                // ❌ ここで snoozed=false にしていたのが原因
+                                // → STOP では「スヌーズ履歴」を消さない
+
+                                // サービス停止
+                                val stop = Intent(
+                                    this@AlarmActivity,
+                                    AlarmRingtoneService::class.java
+                                ).apply {
                                     action = AlarmRingtoneService.ACTION_STOP
                                     putExtra("alarmId", alarmId)
                                 }
                                 startService(stop)
 
-                                // 2) MainActivity に戻る
+                                // アプリへ復帰（sleep_active=true なので SleepScreen へ）
                                 startActivity(
-                                    Intent(this@AlarmActivity, com.example.sleep_garden.MainActivity::class.java).apply {
-                                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                                    Intent(this@AlarmActivity, MainActivity::class.java).apply {
+                                        addFlags(
+                                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                                    Intent.FLAG_ACTIVITY_SINGLE_TOP
+                                        )
                                     }
                                 )
 
@@ -63,16 +73,17 @@ class AlarmActivity : ComponentActivity() {
 
                         Spacer(Modifier.height(20.dp))
 
-                        /* ------------------ スヌーズボタン ------------------ */
+                        // ==== スヌーズボタン ====
                         Button(
                             onClick = {
-                                // ★★★ この一行が超重要！！ ★★★
-                                setSnoozed(this@AlarmActivity, true)
+                                // 🔥 スヌーズ履歴を保存（このフラグは SleepScreen まで持ち越す）
+                                val prefs = getSharedPreferences("sleep_prefs", Context.MODE_PRIVATE)
+                                prefs.edit().putBoolean("snoozed", true).apply()
 
-                                // サービスにスヌーズ指示
+                                // サービスにスヌーズアクション送信（1分後に再度鳴動）
                                 sendServiceAction(AlarmRingtoneService.ACTION_SNOOZE)
 
-                                // 画面閉じる
+                                // この画面は閉じる
                                 finish()
                             },
                             modifier = Modifier.fillMaxWidth(0.6f)
@@ -85,7 +96,7 @@ class AlarmActivity : ComponentActivity() {
         }
     }
 
-    /** サービスへ停止/スヌーズのアクションを送る */
+    /** サービスに停止/スヌーズのアクションを送る */
     private fun sendServiceAction(action: String) {
         val intent = Intent(this, AlarmRingtoneService::class.java).apply {
             this.action = action
