@@ -24,6 +24,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val dao = FlowerDatabase.getInstance(app).flowerDao()
     private val repo = FlowerRepository(dao)
+    private val MIN_MINUTES_FOR_FLOWER = 299
 
     val flowers: Flow<List<Flower>> = repo.flow
 
@@ -253,6 +254,8 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
 
         // そもそも0分以下なら何も出さない
         if (minutes <= 0) return@withContext null
+
+        if (minutes < MIN_MINUTES_FOR_FLOWER) return@withContext null
 
         val all = dao.getAll()
         if (all.isEmpty()) return@withContext null
