@@ -6,7 +6,7 @@ import androidx.room.PrimaryKey
 /** 1回の睡眠セッション（ログ） */
 @Entity(tableName = "xp_session")
 data class XpSessionEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0L,
+    @PrimaryKey(autoGenerate = false) val id: Long = 0L,
     val sleepAtMillis: Long,   // 就寝時刻 (epoch millis)
     val wakeAtMillis: Long,    // 起床時刻 (epoch millis)
     val durationMin: Int,      // 睡眠時間(分)

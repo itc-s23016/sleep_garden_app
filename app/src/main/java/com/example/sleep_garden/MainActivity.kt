@@ -1,6 +1,7 @@
 package com.example.sleep_garden
 
 import android.content.Context
+import android.media.AudioManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -132,6 +133,7 @@ class MainActivity : ComponentActivity() {
 // ======================================================
 // HomeScreen（ボタン位置そのまま）
 // ======================================================
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HomeScreen(
@@ -165,8 +167,10 @@ private fun HomeScreen(
             CenterAlignedTopAppBar(
                 title = { Text("睡眠花育成", style = MaterialTheme.typography.titleLarge) },
                 actions = {
+
                     IconButton(onClick = {}) {
                         Icon(Icons.Filled.Notifications, contentDescription = null)
+
                     }
                     IconButton(onClick = onToggleTheme) {
                         val icon =
