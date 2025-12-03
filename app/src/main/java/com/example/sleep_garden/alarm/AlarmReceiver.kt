@@ -7,16 +7,17 @@ import android.os.Build
 
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+
         val alarmId = intent.getStringExtra("alarmId") ?: "default"
 
         val svc = Intent(context, AlarmRingtoneService::class.java).apply {
-            action = AlarmRingtoneService.ACTION_START
+            this.action = AlarmRingtoneService.ACTION_START
             putExtra("alarmId", alarmId)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
             context.startForegroundService(svc)
-        } else {
+        else
             context.startService(svc)
-        }
     }
 }
