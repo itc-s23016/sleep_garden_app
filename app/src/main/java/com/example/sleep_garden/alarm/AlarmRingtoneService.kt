@@ -9,12 +9,11 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.IBinder
 import android.provider.Settings
-import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.VISIBILITY_PUBLIC
+import androidx.core.app.TaskStackBuilder
 import kotlin.math.abs
 
 class AlarmRingtoneService : Service() {
@@ -45,15 +44,36 @@ class AlarmRingtoneService : Service() {
     }
 
     private fun buildAlarmNotification(): Notification {
-        val full = Intent(this, AlarmActivity::class.java).apply {
+        // 起動先（アラーム画面）
+        val fullIntent = Intent(this, AlarmActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
             putExtra("alarmId", alarmId)
         }
 
-        val contentPi = PendingIntent.getActivity(
-            this,
-            ("f_$alarmId").hashCode(),
-            full,
+        // ✅ バックスタック付きの contentIntent を作成（タップで確実に Activity へ遷移）
+        val contentPi = TaskStackBuilder.create(this)
+            .addNextIntentWithParentStack(fullIntent)
+            .getPendingIntent(
+                ("open_$alarmId").hashCode(),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+        // 停止／スヌーズ アクション
+        val stopIntent = Intent(this, AlarmRingtoneService::class.java).apply {
+            action = ACTION_STOP
+            putExtra("alarmId", alarmId)
+        }
+        val stopPi = PendingIntent.getService(
+            this, ("stop_$alarmId").hashCode(), stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val snoozeIntent = Intent(this, AlarmRingtoneService::class.java).apply {
+            action = ACTION_SNOOZE
+            putExtra("alarmId", alarmId)
+        }
+        val snoozePi = PendingIntent.getService(
+            this, ("snooze_$alarmId").hashCode(), snoozeIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -65,7 +85,13 @@ class AlarmRingtoneService : Service() {
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setVisibility(VISIBILITY_PUBLIC)
             .setOngoing(true)
+            // ✅ タップ時に開く PendingIntent を必ず設定
+            .setContentIntent(contentPi) // FIX: これが無いとタップで開かない
+            // Heads-up/ロック画面での全画面表示も維持
             .setFullScreenIntent(contentPi, true)
+            // 操作ボタン（任意）
+            .addAction(0, "停止", stopPi)
+            .addAction(0, "スヌーズ", snoozePi)
             .build()
     }
 
@@ -110,7 +136,8 @@ private fun scheduleAfterMinute(context: Context, alarmId: String, minutes: Int)
 
     val fireIntent = Intent(context, AlarmReceiver::class.java).apply {
         putExtra("alarmId", alarmId)
-        action = "com.example.sleep.ALARM_$alarmId"
+        // ✅ 他の箇所と action を統一
+        action = "com.example.sleep_garden.ALARM_$alarmId"
     }
 
     val firePi = PendingIntent.getBroadcast(

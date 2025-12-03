@@ -62,13 +62,6 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 found = false
             ),
             Flower(
-                name = "アルファナ",
-                rarity = 6,
-                description = "圧倒的な重厚感。周りに見せつける高級感。他とは一線を引く見た目。" ,
-                imageResId = R.drawable.alfana,
-                found = false
-            ),
-            Flower(
                 name = "アサガオ",
                 rarity = 1,
                 description = "小学生の時よく育てる。土がアルカリだと青に、酸性だと赤になるはず。" ,
@@ -185,7 +178,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity =5,
                 description = "珍しすぎる花、２日で枯れてしまう。" ,
                 imageResId = R.drawable.syokudaiookonnyaku,
-                found = true
+                found = false
             ),
             Flower(
                 name = "サボテン",
@@ -199,7 +192,14 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity =6,
                 description = "これはランの花である" ,
                 imageResId = R.drawable.kamakiri,
-                found = true
+                found = false
+            ),
+            Flower(
+                name = "アルファナ",
+                rarity = 6,
+                description = "圧倒的な重厚感。周りに見せつける高級感。他とは一線を引く見た目。" ,
+                imageResId = R.drawable.alfana,
+                found = false
             ),
         )
 
@@ -296,12 +296,11 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         val candidates = baseList.filter { it.rarity == star }
         if (candidates.isEmpty()) return@withContext null
 
-            // 未発見なら found = false（元のまま）
-            if (!picked.found) {
-                repo.update(picked.copy(found = true))
-            }
+        val picked = pickWeighted(candidates)
 
-
+        // 未発見なら found = false（元のまま）
+        if (!picked.found) { repo.update(picked.copy(found = true))
+        }
         // 未発見なら found=true に更新
         if (!picked.found) {
             repo.update(picked.copy(found = true))

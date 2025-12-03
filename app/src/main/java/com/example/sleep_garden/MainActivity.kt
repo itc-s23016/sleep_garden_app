@@ -87,7 +87,9 @@ class MainActivity : ComponentActivity() {
                             isDark = isDark,
                             onToggleTheme = { isDark = !isDark },
                             onAlarmClick = { nav.navigate("alarm") },
-                            onDexClick = { nav.navigate("zukan") },
+                            onDexClick = {
+                                nav.navigate("zukan")
+                            },
                             onSleepClick = {
                                 setSleepActive(applicationContext, true)
                                 setSleepStartAt(
@@ -99,9 +101,13 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // 図鑑
+                    // 図鑑（★ ダーク/ライト切替の状態とトグルを渡す）
                     composable("zukan") {
-                        Zukan(onBack = { nav.popBackStack() })
+                        Zukan(
+                            isDark = isDark,
+                            onToggleTheme = { isDark = !isDark },
+                            onBack = { nav.popBackStack() }
+                        )
                     }
 
                     // SLEEP
@@ -237,7 +243,7 @@ private fun HomeScreen(
 
                 Spacer(Modifier.weight(1f))
 
-                // ★★★ ボタン位置は元コードのまま固定 ★★★
+                // ★★★ ボタン位置は元コードのまま固定（必要なら y を調整） ★★★
                 BoxWithConstraints(Modifier.fillMaxWidth()) {
                     val buttonScale = 1.18f
                     val rowBtnHeight =
