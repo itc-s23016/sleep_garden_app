@@ -37,6 +37,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity = 3,
                 description = "太陽のように明るい花。黄色いだけがとりえ、種食われがち",
                 imageResId = R.drawable.himawari,
+
                 found = false
             ),
             Flower(
@@ -58,125 +59,146 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity = 5,
                 description = "棘があり、きれい生命力は強い,きれいだから棘があるのか、棘があるからきれいなのか。" ,
                 imageResId = R.drawable.bara,
-                found = true
+                found = false
             ),
             Flower(
                 name = "アルファナ",
                 rarity = 6,
                 description = "圧倒的な重厚感。周りに見せつける高級感。他とは一線を引く見た目。" ,
                 imageResId = R.drawable.alfana,
-                found = true
+                found = false
             ),
             Flower(
                 name = "アサガオ",
                 rarity = 1,
                 description = "小学生の時よく育てる。土がアルカリだと青に、酸性だと赤になるはず。" ,
                 imageResId = R.drawable.asagao,
-                found = true
+                found = false
             ),
             Flower(
                 name = "ガーベラ",
                 rarity =2,
                 description = "チェンソーマンにレぜがあげる花。花言葉は色によりけり" ,
                 imageResId = R.drawable.gabera,
-                found = true
+                found = false
             ),
             Flower(
                 name = "ハイビスカス",
                 rarity =5,
                 description = "沖縄を象徴する花、観光客がよく頭につけている、どこで買えるかは謎である。" ,
                 imageResId = R.drawable.haibisukasu,
-                found = true
+                found = false
             ),
             Flower(
-                name = "彼岸版",
+                name = "彼岸花",
                 rarity = 5,
                 description = "実物はあまり見たことがない、田舎ならそこらへんに生えてるイメージ、怖い話に使われがち" ,
                 imageResId = R.drawable.higanbana,
-                found = true
+                found = false
             ),
             Flower(
                 name = "カーネーション",
                 rarity = 3,
                 description = "母の日に送られがちな花、色水を吸わされ色を変える拷問されがち" ,
                 imageResId = R.drawable.kanesyon,
-                found = true
+                found = false
             ),
             Flower(
                 name = "金木犀",
                 rarity =2,
                 description = "香料にされがち、嗅いだことない。歌の題名にもされがち" ,
                 imageResId = R.drawable.kinmokusei,
-                found = true
+                found = false
             ),
             Flower(
                 name = "コスモス",
                 rarity = 1,
                 description = "合唱曲での印象、コスモスはギリシャ語で宇宙、調和らしい。" ,
                 imageResId = R.drawable.kosumosu,
-                found = true
+                found = false
             ),
             Flower(
                 name = "パンジー",
                 rarity = 1,
                 description = "よく見ると、ちょび髭もおっさんにんに似ている。" ,
                 imageResId = R.drawable.panzi,
-                found = true
+                found = false
             ),
             Flower(
                 name = "睡蓮",
                 rarity = 4,
                 description = "睡蓮と蓮の違いは、睡蓮が浮いてて、蓮は茎が伸びている感じ" ,
                 imageResId = R.drawable.suirenn,
-                found = true
+                found = false
             ),
             Flower(
                 name = "イシクラゲ",
                 rarity = 3,
                 description = "校庭などに、いつの間にか生えてくる藻の一種、鉄分がぶどうの約３２倍あるらしい。" ,
                 imageResId = R.drawable.wakame,
-                found = true
+                found = false
             ),
             Flower(
                 name = "ウツボカズラ",
                 rarity =4,
                 description = "あなに落ちる罠、溶かしてたべる。以外とホームセンターで売ってる。" ,
                 imageResId = R.drawable.utubokazura,
-                found = true
+                found = false
             ),
             Flower(
                 name = "梅",
-                rarity =5,
+                rarity =1,
                 description = "梅の花言葉は「上品」、「高潔」など女学生みたいな花言葉" ,
                 imageResId = R.drawable.ume,
-                found = true
+                found = false
             ),
             Flower(
                 name = "すずらん",
                 rarity =3,
                 description = "見た目はガチで音なりそうな見た目、見たことはあんまない" ,
                 imageResId = R.drawable.suzuran,
-                found = true
+                found = false
             ),
             Flower(
                 name = "ライラック",
                 rarity =3,
                 description = "あの頃の青を　覚えていようぜ　痛みが重なっても　アイシテル" ,
                 imageResId = R.drawable.rairakku,
-                found = true
+                found = false
             ),
             Flower(
                 name = "ずんだもん",
                 rarity =5,
                 description = "そろそろ収穫なのだ、最近人気になって供給が追いつかないのだ" ,
                 imageResId = R.drawable.zundamon,
-                found = true
+                found = false
             ),
             Flower(
                 name = "ラフレシア",
                 rarity =5,
                 description = "世界一大きい花、臭くハエに花粉を運んでもらう。" ,
                 imageResId = R.drawable.rahuresia,
+                found = false
+            ),
+            Flower(
+                name = "ショクダイオオコンニャク",
+                rarity =5,
+                description = "珍しすぎる花、２日で枯れてしまう。" ,
+                imageResId = R.drawable.syokudaiookonnyaku,
+                found = true
+            ),
+            Flower(
+                name = "サボテン",
+                rarity =2,
+                description = "この棘は、水を効率的に取るためにある",
+                imageResId = R.drawable.saboten,
+                found = false
+            ),
+            Flower(
+                name = "ラン",
+                rarity =6,
+                description = "これはランの花である" ,
+                imageResId = R.drawable.kamakiri,
                 found = true
             ),
         )
@@ -274,8 +296,11 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         val candidates = baseList.filter { it.rarity == star }
         if (candidates.isEmpty()) return@withContext null
 
-        // 同じ★の中から重み付きで抽選
-        val picked = pickWeighted(candidates)
+            // 未発見なら found = false（元のまま）
+            if (!picked.found) {
+                repo.update(picked.copy(found = true))
+            }
+
 
         // 未発見なら found=true に更新
         if (!picked.found) {
