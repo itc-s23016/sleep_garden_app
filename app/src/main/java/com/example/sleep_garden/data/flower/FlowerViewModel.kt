@@ -34,7 +34,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity = 3,
                 description = "太陽のように明るい花。黄色いだけがとりえ、種食われがち",
                 imageResId = R.drawable.himawari,
-                found = true,
+                found = false,
             ),
             Flower(
                 name = "さくら",
@@ -181,7 +181,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity =5,
                 description = "珍しすぎる花、２日で枯れてしまう。" ,
                 imageResId = R.drawable.syokudaiookonnyaku,
-                found = true
+                found = false
             ),
             Flower(
                 name = "サボテン",
@@ -195,7 +195,83 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity =6,
                 description = "これはランの花である" ,
                 imageResId = R.drawable.kamakiri,
-                found = true
+                found = false
+            ),
+            Flower(
+                name = "カスミソウ",
+                rarity =1,
+                description = "花言葉は「幸福」「感謝」があり、結婚祝いやウェディング用のブーケとしてもとても人気があります。６月〜８月頃に開花する。" ,
+                imageResId = R.drawable.kasumisou,
+                found = false
+            ),
+            Flower(
+                name = "マーガレット",
+                rarity =2,
+                description = "白と黄色のコントラストがかわいく、ナチュラルな雰囲気のお花が好きな人に人気が\n" +
+                        "　ある。花言葉は「信頼」「真実の愛」「恋占い」です。" ,
+                imageResId = R.drawable.magaretto,
+                found = false
+            ),
+            Flower(
+                name = "竹",
+                rarity =3,
+                description = "一日に一メートル伸びる竹、" ,
+                imageResId = R.drawable.take,
+                found = false
+            ),
+            Flower(
+                name = "蓮",
+                rarity =5,
+                description = "睡蓮との違いは、水面に花ができるか、茎が伸びて、水面よりもっと上に咲くのが蓮" ,
+                imageResId = R.drawable.hasu,
+                found = false
+            ),
+            Flower(
+                name = "鬼灯",
+                rarity =4,
+                description = "赤いちょうちんがぶら下がったような姿が愛らしい" ,
+                imageResId = R.drawable.hooduki,
+                found = false
+            ),
+            Flower(
+                name = "胡蝶蘭",
+                rarity =2,
+                description = "花言葉が「幸福が飛んでくる」「幸福」「純粋な愛」という意味を持つ胡蝶蘭は、" +
+                        "　開店・開業祝いや就任祝い、還暦祝いなどに需要がありギフトの中でも人気が高い。" ,
+                imageResId = R.drawable.kotyouran,
+                found = false
+            ),
+            Flower(
+                name = "キキョウ",
+                rarity =2,
+                description = "紫色が特徴的で、秋の七草としても有名なキキョウはシニア世代に人気が高いです。" +
+                        "　花言葉は「誠実」「気品」「永遠の愛」「変わらぬ愛」です。" ,
+                imageResId = R.drawable.kikyou,
+                found = false
+            ),
+            Flower(
+                name = "スミレ",
+                rarity =2,
+                description = "小さな紫色のお花で道端や庭先でも目にすることができる多年草です。" +
+                        "　花言葉は「謙虚」「誠実」です。",
+                imageResId = R.drawable.sumire,
+                found = false
+            ),
+            Flower(
+                name = "アネモネ",
+                rarity =3,
+                description = "アネモネは種類によっても異なりますが、花の中心が黒くなっているのが一般的です。" +
+                        "　花言葉は「あなたを愛します」「はかない愛」です。" ,
+                imageResId = R.drawable.anemone,
+                found = false
+            ),
+            Flower(
+                name = "ポピー",
+                rarity =2,
+                description = "日本では「ヒナゲシ」とも呼ばれる植物で、オレンジや赤、白など鮮やかなカラー" +
+                        "　が人気です。花言葉は「思いやり」「労り」「陽気で優しい」「恋の予感」です。" ,
+                imageResId = R.drawable.popi,
+                found = false
             ),
         )
 
