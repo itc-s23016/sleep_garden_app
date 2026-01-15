@@ -58,13 +58,6 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 found = false
             ),
             Flower(
-                name = "アルファナ",
-                rarity = 6,
-                description = "圧倒的な重厚感。周りに見せつける高級感。他とは一線を引く見た目。" ,
-                imageResId = R.drawable.alfana,
-                found = false
-            ),
-            Flower(
                 name = "アサガオ",
                 rarity = 1,
                 description = "小学生の時よく育てる。土がアルカリだと青に、酸性だと赤になるはず。" ,
@@ -271,6 +264,12 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 description = "日本では「ヒナゲシ」とも呼ばれる植物で、オレンジや赤、白など鮮やかなカラー" +
                         "　が人気です。花言葉は「思いやり」「労り」「陽気で優しい」「恋の予感」です。" ,
                 imageResId = R.drawable.popi,
+            ),
+            Flower(
+                name = "アルファナ",
+                rarity = 6,
+                description = "圧倒的な重厚感。周りに見せつける高級感。他とは一線を引く見た目。" ,
+                imageResId = R.drawable.alfana,
                 found = false
             ),
         )
@@ -373,5 +372,6 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
             }
 
             picked
+
         }
 }

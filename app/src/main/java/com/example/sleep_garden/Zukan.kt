@@ -31,10 +31,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.sleep_garden.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Zukan(
+    isDark: Boolean,               // ★ 追加：MainActivity から受け取る
+    onToggleTheme: () -> Unit,     // ★ 追加：トグル用コールバック
     onBack: (() -> Unit)? = null
 ) {
     val ctx = LocalContext.current
@@ -72,12 +75,6 @@ fun Zukan(
         else if (ctx is Activity) ctx.finish()
     }
 
-    // ★ レアリティごとにグルーピング（★1 → ★6）
-    val groupedByRarity: Map<Int, List<Flower>> =
-        flowers
-            .sortedBy { it.rarity }   // 一応ソート
-            .groupBy { it.rarity }    // rarity をキーにまとめる
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -91,10 +88,22 @@ fun Zukan(
                 },
                 navigationIcon = {},
                 actions = {
+                    // 戻る
                     IconButton(onClick = { handleBack() }) {
                         Icon(
                             imageVector = Icons.Filled.ArrowBack,
                             contentDescription = "戻る",
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    // ★ 追加：ダーク/ライト切替
+                    IconButton(onClick = onToggleTheme) {
+                        val icon =
+                            if (isDark) R.drawable.ic_light_mode_24
+                            else        R.drawable.ic_dark_mode_24
+                        Icon(
+                            painter = painterResource(icon),
+                            contentDescription = "テーマ切替",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -156,7 +165,7 @@ fun Zukan(
                 } else {
                     // 下部：レアリティごとに区切り付きのグリッド
                     LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),   // 3列で写真大きめ
+                        columns = GridCells.Fixed(2),
                         contentPadding = PaddingValues(vertical = 8.dp),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
@@ -182,7 +191,6 @@ fun Zukan(
                             item(key = f.id) {
                                 ZukanCell(f) { selected = f }
                             }
-
                         }
                     }
                 }
@@ -199,7 +207,6 @@ fun Zukan(
             }
 
             // 花の詳細カード（★レアリティによって豪華さが変わる★）
-
             selected?.let { f ->
                 val rarityText = rarityLabel(f.rarity)
                 val rarityColor = rarityColor(f.rarity)
@@ -232,7 +239,7 @@ fun Zukan(
                             verticalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
 
-                            // レア度メッセージ（レアリティが高いほど派手に）
+                            // レア度メッセージ
                             when {
                                 f.rarity >= 6 -> {
                                     Text(
@@ -296,7 +303,6 @@ fun Zukan(
                                         contentScale = ContentScale.Crop
                                     )
 
-                                    // ★ レアリティ5,6なら画像の上にキラキラ
                                     if (f.rarity >= 5) {
                                         Text(
                                             text = "✨",
@@ -399,7 +405,7 @@ private fun RarityLegend() {
                 fontWeight = FontWeight.Bold
             )
 
-            for (r in 1..6) {   // ★ 6 まで表示
+            for (r in 1..6) {
                 val color = rarityColor(r)
                 val label = rarityLabel(r)
 
@@ -494,11 +500,11 @@ private fun rarityStars(rarity: Int): String {
 
 private fun rarityColor(rarity: Int): Color = when (rarity) {
     1 -> Color(0xFF6B7280) // グレー
-    2 -> Color(0xFF22C55E) // グリーン
-    3 -> Color(0xFF3B82F6) // ブルー
-    4 -> Color(0xFF8B5CF6) // パープル
-    5 -> Color(0xFFFACC15) // ゴールド
-    6 -> Color(0xFFAE0014) // ピンクゴールド系（お好みで変更OK）
+    2 -> Color(0xFF00D84D) // グリーン
+    3 -> Color(0xFF005ECA) // ブルー
+    4 -> Color(0xFF5A00B7) // パープル
+    5 -> Color(0xFFCC8C00) // ゴールド
+    6 -> Color(0xFFF82139) // ピンクゴールド系
     else -> Color(0xFF9CA3AF)
 }
 
@@ -521,31 +527,33 @@ private fun rarityDetailBorder(rarity: Int, baseColor: Color): Pair<Dp, Color> =
 private fun rarityDetailGradientColors(rarity: Int): List<Color> = when (rarity) {
     1 -> listOf(
         Color(0xFFF9FAFB),
-        Color(0xFFF3F4F6)
+        Color(0xFFA9A9A9)
     )
     2 -> listOf(
         Color(0xFFE9FDF3),
-        Color(0xFFD1FAE5)
+        Color(0xFF009535)
     )
     3 -> listOf(
         Color(0xFFE0F2FE),
-        Color(0xFFBFDBFE)
+        Color(0xFF006BEF)
     )
     4 -> listOf(
         Color(0xFFF3E8FF),
-        Color(0xFFE9D5FF)
+        Color(0xFF7C00FF)
     )
     5 -> listOf(
         Color(0xFFFFF7E0),
-        Color(0xFFFFE59E)
+        Color(0xFFF3AE00)
     )
     6 -> listOf(
-        Color(0xFFFF0000),
-        Color(0xFF610068)
+        Color(0xFF0027CC),
+        Color(0xFF25FF4B),
+        Color(0xFFFFAA00),
+        Color(0xFFFF00DE)
     )
     else -> listOf(
         Color(0xFFFF0000),
-        Color(0xB57A00B2)
+        Color(0xB5000000)
     )
 }
 
