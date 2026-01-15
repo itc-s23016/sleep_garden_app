@@ -77,5 +77,4 @@ room {
     // スキーマJSONの出力先（app/schemas フォルダを作っておく）
     schemaDirectory("$projectDir/room_schemas")
 }
-
 // ★ ここに ksp { arg("room.schemaLocation", ...) } は書かない

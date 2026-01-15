@@ -1,11 +1,9 @@
 package com.example.sleep_garden.data.flower
 
 import android.app.Application
-import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.sleep_garden.R
-import com.example.sleep_garden.data.XpRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -24,7 +22,6 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
 
     private val dao = FlowerDatabase.getInstance(app).flowerDao()
     private val repo = FlowerRepository(dao)
-    private val MIN_MINUTES_FOR_FLOWER = 299
 
     val flowers: Flow<List<Flower>> = repo.flow
 
@@ -37,8 +34,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 rarity = 3,
                 description = "太陽のように明るい花。黄色いだけがとりえ、種食われがち",
                 imageResId = R.drawable.himawari,
-
-                found = false
+                found = false,
             ),
             Flower(
                 name = "さくら",
@@ -71,7 +67,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
             Flower(
                 name = "ガーベラ",
                 rarity =2,
-                description = "チェンソーマンにレぜがあげる花。花言葉は色によりけり" ,
+                description = "チェンソーマンにレぜにあげる花。花言葉は色によりけり" ,
                 imageResId = R.drawable.gabera,
                 found = false
             ),
@@ -125,9 +121,9 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 found = false
             ),
             Flower(
-                name = "イシクラゲ",
+                name = "わかめ",
                 rarity = 3,
-                description = "校庭などに、いつの間にか生えてくる藻の一種、鉄分がぶどうの約３２倍あるらしい。" ,
+                description = "校庭などに、いつの間にか生えてくるわかめ、一応食べれるらしい。" ,
                 imageResId = R.drawable.wakame,
                 found = false
             ),
@@ -195,6 +191,81 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
                 found = false
             ),
             Flower(
+                name = "カスミソウ",
+                rarity =1,
+                description = "花言葉は「幸福」「感謝」があり、結婚祝いやウェディング用のブーケとしてもとても人気があります。６月〜８月頃に開花する。" ,
+                imageResId = R.drawable.kasumisou,
+                found = false
+            ),
+            Flower(
+                name = "マーガレット",
+                rarity =2,
+                description = "白と黄色のコントラストがかわいく、ナチュラルな雰囲気のお花が好きな人に人気が\n" +
+                        "　ある。花言葉は「信頼」「真実の愛」「恋占い」です。" ,
+                imageResId = R.drawable.magaretto,
+                found = false
+            ),
+            Flower(
+                name = "竹",
+                rarity =3,
+                description = "一日に一メートル伸びる竹、" ,
+                imageResId = R.drawable.take,
+                found = false
+            ),
+            Flower(
+                name = "蓮",
+                rarity =5,
+                description = "睡蓮との違いは、水面に花ができるか、茎が伸びて、水面よりもっと上に咲くのが蓮" ,
+                imageResId = R.drawable.hasu,
+                found = false
+            ),
+            Flower(
+                name = "鬼灯",
+                rarity =4,
+                description = "赤いちょうちんがぶら下がったような姿が愛らしい" ,
+                imageResId = R.drawable.hooduki,
+                found = false
+            ),
+            Flower(
+                name = "胡蝶蘭",
+                rarity =2,
+                description = "花言葉が「幸福が飛んでくる」「幸福」「純粋な愛」という意味を持つ胡蝶蘭は、" +
+                        "　開店・開業祝いや就任祝い、還暦祝いなどに需要がありギフトの中でも人気が高い。" ,
+                imageResId = R.drawable.kotyouran,
+                found = false
+            ),
+            Flower(
+                name = "キキョウ",
+                rarity =2,
+                description = "紫色が特徴的で、秋の七草としても有名なキキョウはシニア世代に人気が高いです。" +
+                        "　花言葉は「誠実」「気品」「永遠の愛」「変わらぬ愛」です。" ,
+                imageResId = R.drawable.kikyou,
+                found = false
+            ),
+            Flower(
+                name = "スミレ",
+                rarity =2,
+                description = "小さな紫色のお花で道端や庭先でも目にすることができる多年草です。" +
+                        "　花言葉は「謙虚」「誠実」です。",
+                imageResId = R.drawable.sumire,
+                found = false
+            ),
+            Flower(
+                name = "アネモネ",
+                rarity =3,
+                description = "アネモネは種類によっても異なりますが、花の中心が黒くなっているのが一般的です。" +
+                        "　花言葉は「あなたを愛します」「はかない愛」です。" ,
+                imageResId = R.drawable.anemone,
+                found = false
+            ),
+            Flower(
+                name = "ポピー",
+                rarity =2,
+                description = "日本では「ヒナゲシ」とも呼ばれる植物で、オレンジや赤、白など鮮やかなカラー" +
+                        "　が人気です。花言葉は「思いやり」「労り」「陽気で優しい」「恋の予感」です。" ,
+                imageResId = R.drawable.popi,
+            ),
+            Flower(
                 name = "アルファナ",
                 rarity = 6,
                 description = "圧倒的な重厚感。周りに見せつける高級感。他とは一線を引く見た目。" ,
@@ -206,6 +277,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         val all = list
         for (f in all) {
             val exist = dao.findByName(f.name)
+
             if (exist == null) {
                 repo.insert(f)
             } else {
@@ -219,6 +291,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
 
     /* ここから下は追加・変更部分のみ */
 
@@ -235,7 +308,8 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         return flowerList.last()
     }
 
-    /** レベルごとの★確率 */
+
+    /** ★レベル別確率（追加） */
     private fun getStarProbabilities(level: Int): List<Float> {
         return when (level) {
             1 -> listOf(0.50f, 0.30f, 0.15f, 0.04f, 0.01f, 0f)
@@ -252,6 +326,7 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** ★レア度抽選（追加） */
     private fun drawStar(prob: List<Float>): Int {
         val r = Math.random().toFloat()
         var acc = 0f
@@ -262,50 +337,41 @@ class FlowerViewModel(app: Application) : AndroidViewModel(app) {
         return 1
     }
 
-    /**
-     * ★ ここが超重要 ★
-     * snoozed=true のときは「絶対に花を返さない（null）」。
-     */
-    suspend fun rewardRandomFlowerIfEligible(
-        minutes: Int,
-        snoozed: Boolean
-    ): Flower? = withContext(Dispatchers.IO) {
 
-        // スヌーズだったら絶対に花ガチャしない
-        if (snoozed) return@withContext null
+    /** ★ rewardRandomFlowerIfEligible（変更最小） */
+    suspend fun rewardRandomFlowerIfEligible(minutes: Int): Flower? =
+        withContext(Dispatchers.IO) {
 
-        // そもそも0分以下なら何も出さない
-        if (minutes <= 0) return@withContext null
+            if (minutes < 0.1) return@withContext null
 
-        if (minutes < MIN_MINUTES_FOR_FLOWER) return@withContext null
+            val all = dao.getAll()
+            if (all.isEmpty()) return@withContext null
 
-        val all = dao.getAll()
-        if (all.isEmpty()) return@withContext null
+            // 未発見を優先（元のまま）
+            val notFound = all.filter { !it.found }
+            val baseList = if (notFound.isNotEmpty()) notFound else all
 
-        // 未発見を優先
-        val notFound = all.filter { !it.found }
-        val baseList = if (notFound.isNotEmpty()) notFound else all
+            // XPレベル取得（追加）
+            val ctx = getApplication<Application>().applicationContext
+            val xpRepo = com.example.sleep_garden.data.XpRepository.getInstance(ctx)
+            val level = xpRepo.getLevel()
 
-        // レベル取得
-        val ctx: Context = getApplication<Application>().applicationContext
-        val xpRepo = XpRepository.getInstance(ctx)
-        val level = xpRepo.getLevel()
+            // レベル別で★を抽選（追加）
+            val star = drawStar(getStarProbabilities(level))
 
-        // レア度（★）を抽選
-        val star = drawStar(getStarProbabilities(level))
-        val candidates = baseList.filter { it.rarity == star }
-        if (candidates.isEmpty()) return@withContext null
+            // 抽選されたレア度の花に絞る（追加）
+            val candidates = baseList.filter { it.rarity == star }
+            if (candidates.isEmpty()) return@withContext null
 
-        val picked = pickWeighted(candidates)
+            // 同レア度内は pickWeighted（元のまま）
+            val picked = pickWeighted(candidates)
 
-        // 未発見なら found = false（元のまま）
-        if (!picked.found) { repo.update(picked.copy(found = true))
+            // 未発見なら found = false（元のまま）
+            if (!picked.found) {
+                repo.update(picked.copy(found = true))
+            }
+
+            picked
+
         }
-        // 未発見なら found=true に更新
-        if (!picked.found) {
-            repo.update(picked.copy(found = true))
-        }
-
-        picked
-    }
 }
