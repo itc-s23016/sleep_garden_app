@@ -72,6 +72,12 @@ fun Zukan(
         else if (ctx is Activity) ctx.finish()
     }
 
+    // ★ レアリティごとにグルーピング（★1 → ★6）
+    val groupedByRarity: Map<Int, List<Flower>> =
+        flowers
+            .sortedBy { it.rarity }   // 一応ソート
+            .groupBy { it.rarity }    // rarity をキーにまとめる
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -176,6 +182,7 @@ fun Zukan(
                             item(key = f.id) {
                                 ZukanCell(f) { selected = f }
                             }
+
                         }
                     }
                 }
@@ -192,6 +199,7 @@ fun Zukan(
             }
 
             // 花の詳細カード（★レアリティによって豪華さが変わる★）
+
             selected?.let { f ->
                 val rarityText = rarityLabel(f.rarity)
                 val rarityColor = rarityColor(f.rarity)
@@ -542,7 +550,7 @@ private fun rarityDetailGradientColors(rarity: Int): List<Color> = when (rarity)
 }
 
 /* ======================================================
-   グリッド用セル
+   グリッド用セル（元の仕様そのまま）
 ====================================================== */
 @Composable
 private fun ZukanCell(flower: Flower, onClick: () -> Unit) {
@@ -613,5 +621,63 @@ private fun ZukanCell(flower: Flower, onClick: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+/* ======================================================
+   レアリティ見出し
+====================================================== */
+@Composable
+private fun RarityHeader(star: Int) {
+    val bg: Color
+    val label: String
+
+    when (star) {
+        1 -> {
+            bg = Color(0xFFE5E7EB) // グレー
+            label = "★1（よく見る花）"
+        }
+        2 -> {
+            bg = Color(0xFFBFDBFE) // 薄い青
+            label = "★2（ちょっとレア）"
+        }
+        3 -> {
+            bg = Color(0xFFA5B4FC) // 薄い紫
+            label = "★3（レア）"
+        }
+        4 -> {
+            bg = Color(0xFFFACC15) // 黄
+            label = "★4（スーパーレア）"
+        }
+        5 -> {
+            bg = Color(0xFFF97316) // オレンジ
+            label = "★5（ウルトラレア）"
+        }
+        6 -> {
+            bg = Color(0xFFFF4D94) // ピンク
+            label = "★6（ゴージャス）"
+        }
+        else -> {
+            bg = Color(0xFFE5E7EB)
+            label = "★$star"
+        }
+    }
+
+    Surface(
+        color = bg,
+        shape = RoundedCornerShape(16.dp),
+        tonalElevation = 0.dp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 4.dp)
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+            textAlign = TextAlign.Start,
+            color = Color.Black
+        )
     }
 }
